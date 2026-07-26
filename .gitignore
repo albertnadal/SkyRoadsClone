@@ -28,6 +28,7 @@
 *.a
 *.lib
 !third_party/raylib/libraylib.a
+!third_party/box3d/libbox3d.a
 
 # Executables
 *.exe
