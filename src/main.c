@@ -8,6 +8,9 @@
 
 #define MAX_SEGMENTS_PER_LEVEL 100
 #define MAX_LANES_PER_SEGMENT 100
+#define MAX_VISIBLE_SEGMENTS 2
+
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
 static const float SCR_WIDTH = 640.0f;
 static const float SCR_HEIGHT = 480.0f;
@@ -17,7 +20,8 @@ typedef struct {
   Vector3 initialPosition;
   Vector3 size;
   Color color;
-  b3BodyId box3DBody;
+  b3BodyId box3DBodyId;
+  bool isLast;
 } srLane;
 
 typedef struct {
@@ -26,7 +30,7 @@ typedef struct {
 } srRoadSegment;
 
 int totalSegments = 0;
-int currentSegment = 0;
+int currentSegmentIdx = 0;
 srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL];
 
 void loadLevel(int level) {
@@ -55,13 +59,18 @@ void loadLevel(int level) {
       continue;
 
     if (*p == '#') {
-      assert(totalSegments < MAX_SEGMENTS_PER_LEVEL &&
-             "Reached the max number of segments allowed per level.");
+        if (currentRoadSegment != NULL && currentRoadSegment->totalLanes > 0) {
+            currentRoadSegment->lanes[currentRoadSegment->totalLanes - 1].isLast = true;
+        }
 
-      currentRoadSegment = &segments[totalSegments];
-      currentRoadSegment->totalLanes = 0;
-      totalSegments++;
-      continue;
+        assert(totalSegments < MAX_SEGMENTS_PER_LEVEL &&
+               "Reached the max number of segments allowed per level.");
+
+        currentRoadSegment = &segments[totalSegments];
+        currentRoadSegment->totalLanes = 0;
+        totalSegments++;
+
+        continue;
     }
 
     assert(currentRoadSegment != NULL &&
@@ -116,36 +125,50 @@ void loadLevel(int level) {
     case 9:
       lane->color = GRAY;
       break;
+    case 10:
+      lane->color = BROWN;
+      break;
     default:
       lane->color = WHITE;
       break;
     }
 
-    memset(&lane->box3DBody, 0, sizeof(lane->box3DBody));
+    memset(&lane->box3DBodyId, 0, sizeof(lane->box3DBodyId));
+    lane->isLast = false;
     currentRoadSegment->totalLanes++;
+  }
+
+  if (currentRoadSegment != NULL && currentRoadSegment->totalLanes > 0) {
+      currentRoadSegment->lanes[currentRoadSegment->totalLanes - 1].isLast = true;
   }
 
   fclose(fp);
 }
 
+void initSegment(int segmentIdx, b3WorldId worldId) {
+  for (int j = 0; j < segments[segmentIdx].totalLanes; j++) {
+    srLane *lane = &segments[segmentIdx].lanes[j];
+    b3BodyDef laneBodyDef = b3DefaultBodyDef();
+    laneBodyDef.type = b3_staticBody;
+    laneBodyDef.position = (b3Pos){lane->initialPosition.x, lane->initialPosition.y, lane->initialPosition.z};
+    lane->box3DBodyId = b3CreateBody(worldId, &laneBodyDef);
+    b3BoxHull laneStaticBox = b3MakeBoxHull(lane->size.x * 0.5f, lane->size.y * 0.5f, lane->size.z * 0.5f);
+    b3ShapeDef laneShapeDef = b3DefaultShapeDef();
+    laneShapeDef.baseMaterial.friction = 0.3f;
+    laneShapeDef.density = 0.0f; // Set the box density to be non-zero, so it will be dynamic.
+    b3CreateHullShape(lane->box3DBodyId, &laneShapeDef, &laneStaticBox.base);
+  }
+}
+
+void initNextVisibleSegment(b3WorldId worldId) {
+  int nextSegmentIdx = MAX_VISIBLE_SEGMENTS - currentSegmentIdx;
+  initSegment(nextSegmentIdx, worldId);
+}
+
 int main() {
   b3WorldDef worldDef = b3DefaultWorldDef();
   worldDef.gravity = (b3Vec3){0.0f, -9.80665f, 0.0f};
-
   b3WorldId worldId = b3CreateWorld(&worldDef);
-
-  Vector3 laneSize = (Vector3){3.0f, 1.0f, 6.0f};
-  Vector3 lanePos = (Vector3){5.0f, 0.5f, 0.0f};
-
-  b3BodyDef laneBodyDef = b3DefaultBodyDef();
-  laneBodyDef.type = b3_staticBody;
-  laneBodyDef.position = (b3Pos){lanePos.x, lanePos.y, lanePos.z};
-  b3BodyId laneBodyId = b3CreateBody(worldId, &laneBodyDef);
-  b3BoxHull laneStaticBox = b3MakeBoxHull(laneSize.x * 0.5f, laneSize.y * 0.5f, laneSize.z * 0.5f);
-  b3ShapeDef laneShapeDef = b3DefaultShapeDef();
-  laneShapeDef.baseMaterial.friction = 0.3f;
-  laneShapeDef.density = 0.0f; // Set the box density to be non-zero, so it will be dynamic.
-  b3CreateHullShape(laneBodyId, &laneShapeDef, &laneStaticBox.base);
 
   Vector3 shipSize = (Vector3){1.0f, 1.0f, 1.0f};
   Vector3 shipPos = (Vector3){5.5f, 1.5f, 2.0f};
@@ -169,38 +192,50 @@ int main() {
   SetTargetFPS(60);
 
   Camera3D camera = {0};
-  camera.position = (Vector3){5.0f, 4.0f, 10.0f};
-  camera.target = (Vector3){5.0f, 1.0f, 1.0f};
+  //camera.position = (Vector3){5.5f, 5.0f, 20.0f};
+  //camera.target = (Vector3){5.5f, 4.0f, 1.0f};
+  camera.position = (Vector3){5.5f, 5.0f, -116.0f};
+  camera.target = (Vector3){5.5f, 4.0f, -135.0f};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
-  camera.fovy = 45.0f;
+  camera.fovy = 60.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
   b3Vec3 shipForce = {0.0f, 0.0f, -10.0f};
 
   loadLevel(1);
+  for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
+    initSegment(s, worldId);
+  }
 
   while (!WindowShouldClose()) {
     b3Body_ApplyForceToCenter(shipBodyId, shipForce, true);
     b3World_Step(worldId, timeStep, subStepCount);
-    b3Pos lanePosition = b3Body_GetPosition(laneBodyId);
     b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
 
     BeginDrawing();
     ClearBackground(BLACK);
     BeginMode3D(camera);
-    DrawGrid(20, 1.0f);
-    DrawCube((Vector3){lanePosition.x, lanePosition.y, lanePosition.z},
-             laneSize.x, laneSize.y, laneSize.z, BLUE);
-    DrawCubeWires((Vector3){lanePosition.x, lanePosition.y, lanePosition.z},
-                  laneSize.x, laneSize.y, laneSize.z, BLACK);
+    DrawGrid(80, 1.0f);
 
     DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
              shipSize.x, shipSize.y, shipSize.z, GREEN);
     DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
                   shipSize.x, shipSize.y, shipSize.z, BLACK);
+
+    for (int i = currentSegmentIdx; i < MIN(currentSegmentIdx + MAX_VISIBLE_SEGMENTS, totalSegments); i++ ) {
+      for (int j = 0; j < segments[i].totalLanes; j++) {
+        srLane *lane = &segments[i].lanes[j];
+        b3Pos pos = b3Body_GetPosition(lane->box3DBodyId);
+        DrawCube((Vector3){pos.x, pos.y, pos.z}, lane->size.x, lane->size.y, lane->size.z, lane->color);
+        DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, lane->size.x, lane->size.y, lane->size.z, BLACK);
+      }
+    }
+
     EndMode3D();
     DrawFPS(16, 16);
     EndDrawing();
+    // IF Z position of the Ship is higher than the Z position of the last lane of the current segment then 
+    // call the function initNextVisibleSegment(worldId) to load the bodies of the next visible segment.
   }
 
   CloseWindow();
