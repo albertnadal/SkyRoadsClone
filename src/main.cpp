@@ -1,9 +1,132 @@
+#include <assert.h>
 #include <box3d/box3d.h>
+#include <ctype.h>
 #include <raylib/raylib.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
-constexpr float SCR_WIDTH = 640.0f;
-constexpr float SCR_HEIGHT = 480.0f;
-constexpr const char *WINDOW_TITLE = "SkyRoads Clone";
+#define MAX_SEGMENTS_PER_LEVEL 100
+#define MAX_LANES_PER_SEGMENT 100
+
+static const float SCR_WIDTH = 640.0f;
+static const float SCR_HEIGHT = 480.0f;
+static const char *WINDOW_TITLE = "SkyRoads Clone";
+
+typedef struct {
+  Vector3 initialPosition;
+  Vector3 size;
+  Color color;
+  b3BodyId box3DBody;
+} srLane;
+
+typedef struct {
+  int totalLanes;
+  srLane lanes[MAX_LANES_PER_SEGMENT];
+} srRoadSegment;
+
+int totalSegments = 0;
+int currentSegment = 0;
+srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL];
+
+void loadLevel(int level) {
+  char filename[64];
+  snprintf(filename, sizeof(filename), "level%d.dat", level);
+
+  FILE *fp = fopen(filename, "r");
+  assert(fp != NULL && "El fitxer de nivell no existeix.");
+
+  totalSegments = 0;
+  srRoadSegment *currentRoadSegment = NULL;
+  char line[512];
+
+  while (fgets(line, sizeof(line), fp) != NULL) {
+    line[strcspn(line, "\r\n")] = '\0';
+
+    char *comment = strstr(line, "//");
+    if (comment != NULL)
+      *comment = '\0';
+
+    char *p = line;
+    while (isspace((unsigned char)*p))
+      ++p;
+
+    if (*p == '\0')
+      continue;
+
+    if (*p == '#') {
+      assert(totalSegments < MAX_SEGMENTS_PER_LEVEL &&
+             "Reached the max number of segments allowed per level.");
+
+      currentRoadSegment = &segments[totalSegments];
+      currentRoadSegment->totalLanes = 0;
+      totalSegments++;
+      continue;
+    }
+
+    assert(currentRoadSegment != NULL &&
+           "No first segment is defined before defining lanes.");
+
+    assert(currentRoadSegment->totalLanes < MAX_LANES_PER_SEGMENT &&
+           "Reached the max number of lanes allowed per segment.");
+
+    float px, py, pz;
+    float sx, sy, sz;
+    int colorValue;
+    int type;
+    int parsed = sscanf(p, "%f,%f,%f,%f,%f,%f,%d,%d", &px, &py, &pz, &sx, &sy,
+                        &sz, &colorValue, &type);
+
+    assert(parsed == 8 && "Found a lane with an invalid number of parameters. "
+                          "Lanes must have 8 parameters.");
+
+    srLane *lane = &currentRoadSegment->lanes[currentRoadSegment->totalLanes];
+
+    lane->initialPosition = (Vector3){px, py, pz};
+    lane->size = (Vector3){sx, sy, sz};
+
+    switch (colorValue) {
+    case 0:
+      lane->color = BLACK;
+      break;
+    case 1:
+      lane->color = BLUE;
+      break;
+    case 2:
+      lane->color = RED;
+      break;
+    case 3:
+      lane->color = GREEN;
+      break;
+    case 4:
+      lane->color = YELLOW;
+      break;
+    case 5:
+      lane->color = ORANGE;
+      break;
+    case 6:
+      lane->color = PURPLE;
+      break;
+    case 7:
+      lane->color = PINK;
+      break;
+    case 8:
+      lane->color = WHITE;
+      break;
+    case 9:
+      lane->color = GRAY;
+      break;
+    default:
+      lane->color = WHITE;
+      break;
+    }
+
+    memset(&lane->box3DBody, 0, sizeof(lane->box3DBody));
+    currentRoadSegment->totalLanes++;
+  }
+
+  fclose(fp);
+}
 
 int main() {
   b3WorldDef worldDef = b3DefaultWorldDef();
@@ -52,10 +175,12 @@ int main() {
   camera.fovy = 45.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  b3Vec3 shipForce = { 0.0f, 0.0f, -10.0f };
+  b3Vec3 shipForce = {0.0f, 0.0f, -10.0f};
+
+  loadLevel(1);
 
   while (!WindowShouldClose()) {
-    b3Body_ApplyForceToCenter(shipBodyId, shipForce, true);        
+    b3Body_ApplyForceToCenter(shipBodyId, shipForce, true);
     b3World_Step(worldId, timeStep, subStepCount);
     b3Pos lanePosition = b3Body_GetPosition(laneBodyId);
     b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
@@ -63,12 +188,16 @@ int main() {
     BeginDrawing();
     ClearBackground(BLACK);
     BeginMode3D(camera);
-      DrawGrid(20, 1.0f);
-      DrawCube((Vector3){lanePosition.x, lanePosition.y, lanePosition.z}, laneSize.x, laneSize.y, laneSize.z, BLUE);
-      DrawCubeWires((Vector3){lanePosition.x, lanePosition.y, lanePosition.z}, laneSize.x, laneSize.y, laneSize.z, BLACK);
+    DrawGrid(20, 1.0f);
+    DrawCube((Vector3){lanePosition.x, lanePosition.y, lanePosition.z},
+             laneSize.x, laneSize.y, laneSize.z, BLUE);
+    DrawCubeWires((Vector3){lanePosition.x, lanePosition.y, lanePosition.z},
+                  laneSize.x, laneSize.y, laneSize.z, BLACK);
 
-      DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
-      DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
+    DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
+             shipSize.x, shipSize.y, shipSize.z, GREEN);
+    DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
+                  shipSize.x, shipSize.y, shipSize.z, BLACK);
     EndMode3D();
     DrawFPS(16, 16);
     EndDrawing();
