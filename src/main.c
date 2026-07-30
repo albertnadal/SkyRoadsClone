@@ -11,7 +11,7 @@
 #define MAX_VISIBLE_SEGMENTS 2
 #define DISTANCE_BETWEEN_SHIP_AND_CAMERA 10.0f
 #define CAMERA_TARGET_Z_DISTANCE 19.0f
-#define GRAVITY -9.80665f
+#define GRAVITY 4.0f * -9.80665f
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -189,11 +189,14 @@ int main() {
   b3Body_SetMotionLocks (shipBodyId, shipBodyLocks);
   b3BoxHull shipStaticBox = b3MakeBoxHull(shipSize.x * 0.5f, shipSize.y * 0.5f, shipSize.z * 0.5f);
   b3ShapeDef shipShapeDef = b3DefaultShapeDef();
+  shipShapeDef.enableContactEvents = true;
+  shipShapeDef.enableHitEvents = true;
   shipShapeDef.baseMaterial.restitution = 0.0f;
   shipShapeDef.baseMaterial.friction = 0.2f;
   shipShapeDef.density = 20.0f; // Set the box density to be non-zero, so it will be dynamic.
-
   b3CreateHullShape(shipBodyId, &shipShapeDef, &shipStaticBox.base);
+
+  b3ContactEvents events;
 
   // Prepare for simulation. Typically we use a time step of 1/60 of a
   // second (60Hz) and 4 sub-steps. This provides a high quality simulation
@@ -208,7 +211,7 @@ int main() {
   camera.position = (Vector3){5.5f, 6.0f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
   camera.target = (Vector3){5.5f, 1.0f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
-  camera.fovy = 60.0f;
+  camera.fovy = 70.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
   b3Vec3 engineForce = {0.0f, 0.0f, 0.0f},
@@ -218,6 +221,8 @@ int main() {
   for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
     initSegment(s, worldId);
   }
+
+  bool shipOnGround = false;
 
   while (!WindowShouldClose()) {
 
@@ -239,13 +244,55 @@ int main() {
       engineForce.z = 0.0f;
     }
 
-    if (IsKeyDown(KEY_SPACE)) {
-      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 1000.0f, 0.0f}, true);
+    if (IsKeyPressed(KEY_SPACE)) {
+      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 20000.0f, 0.0f}, true);
     }
 
     b3Body_ApplyForceToCenter(shipBodyId, engineForce, true);
     b3Body_ApplyForceToCenter(shipBodyId, lateralForce, true);
+
     b3World_Step(worldId, timeStep, subStepCount);
+    events = b3World_GetContactEvents(worldId);
+
+    for(int i = 0; i < events.hitCount; i++) {
+      b3ContactHitEvent *hit = &events.hitEvents[i];
+      if(hit->normal.z == 1.0f) {
+        printf("FRONTAL COLLISION\n");
+        // TODO: The ship had a frontal collision with a static object.
+        //       Destroy the ship and restart the level.
+      }
+    }
+
+    for(int i = 0; i < events.beginCount; i++) {
+      b3ContactBeginTouchEvent *event = &events.beginEvents[i];
+      if (b3Contact_IsValid(event->contactId)) {
+        b3ContactData data = b3Contact_GetData(event->contactId);
+        for(int j = 0; j < data.manifoldCount; j++) {
+          if(data.manifolds[j].normal.y == 1.0f) {
+            printf("SHIP IS ON THE GROUND\n");
+            shipOnGround = true;
+          }
+        }
+      }
+    }
+
+    for(int i = 0; i < events.endCount; i++) {
+      b3ContactEndTouchEvent *event = &events.endEvents[i];
+      if (b3Shape_IsValid(event->shapeIdA) && b3Shape_IsValid(event->shapeIdB)) {
+        b3AABB aabbA = b3Shape_GetAABB(event->shapeIdA);
+        b3AABB aabbB = b3Shape_GetAABB(event->shapeIdB);
+
+        if((aabbA.upperBound.y < aabbB.lowerBound.y) ||
+           ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.z > aabbB.upperBound.z)) ||
+           ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.x > aabbB.upperBound.x)) ||
+           ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.upperBound.x < aabbB.lowerBound.x))) {
+            printf("SHIP IS NOT ON THE GROUND\n");
+          shipOnGround = false;
+        }
+      }
+    }
+
+
     b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
 
     BeginDrawing();
