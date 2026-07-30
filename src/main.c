@@ -192,10 +192,8 @@ int main() {
   SetTargetFPS(60);
 
   Camera3D camera = {0};
-  //camera.position = (Vector3){5.5f, 5.0f, 20.0f};
-  //camera.target = (Vector3){5.5f, 4.0f, 1.0f};
-  camera.position = (Vector3){5.5f, 5.0f, -116.0f};
-  camera.target = (Vector3){5.5f, 4.0f, -135.0f};
+  camera.position = (Vector3){5.5f, 6.0f, 20.0f};
+  camera.target = (Vector3){5.5f, 1.0f, 1.0f};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
   camera.fovy = 60.0f;
   camera.projection = CAMERA_PERSPECTIVE;
@@ -215,7 +213,7 @@ int main() {
     BeginDrawing();
     ClearBackground(BLACK);
     BeginMode3D(camera);
-    DrawGrid(80, 1.0f);
+    //DrawGrid(80, 1.0f);
 
     DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
              shipSize.x, shipSize.y, shipSize.z, GREEN);
