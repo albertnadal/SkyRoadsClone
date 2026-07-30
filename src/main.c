@@ -9,6 +9,9 @@
 #define MAX_SEGMENTS_PER_LEVEL 100
 #define MAX_LANES_PER_SEGMENT 100
 #define MAX_VISIBLE_SEGMENTS 2
+#define DISTANCE_BETWEEN_SHIP_AND_CAMERA 10.0f
+#define CAMERA_TARGET_Z_DISTANCE 19.0f
+#define GRAVITY -9.80665f
 
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 
@@ -154,8 +157,9 @@ void initSegment(int segmentIdx, b3WorldId worldId) {
     lane->box3DBodyId = b3CreateBody(worldId, &laneBodyDef);
     b3BoxHull laneStaticBox = b3MakeBoxHull(lane->size.x * 0.5f, lane->size.y * 0.5f, lane->size.z * 0.5f);
     b3ShapeDef laneShapeDef = b3DefaultShapeDef();
-    laneShapeDef.baseMaterial.friction = 0.3f;
-    laneShapeDef.density = 0.0f; // Set the box density to be non-zero, so it will be dynamic.
+    laneShapeDef.baseMaterial.restitution = 0.02f;
+    laneShapeDef.baseMaterial.friction = 0.2f;
+    laneShapeDef.density = 10.0f; // Set the box density to be non-zero, so it will be dynamic.
     b3CreateHullShape(lane->box3DBodyId, &laneShapeDef, &laneStaticBox.base);
   }
 }
@@ -167,19 +171,28 @@ void initNextVisibleSegment(b3WorldId worldId) {
 
 int main() {
   b3WorldDef worldDef = b3DefaultWorldDef();
-  worldDef.gravity = (b3Vec3){0.0f, -9.80665f, 0.0f};
+  worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
+  worldDef.restitutionThreshold = 0.1f;
   b3WorldId worldId = b3CreateWorld(&worldDef);
 
   Vector3 shipSize = (Vector3){1.0f, 1.0f, 1.0f};
-  Vector3 shipPos = (Vector3){5.5f, 1.5f, 2.0f};
+  Vector3 shipPos = (Vector3){5.5f, 1.5f, 10.0f};
 
   b3BodyDef shipBodyDef = b3DefaultBodyDef();
   shipBodyDef.type = b3_dynamicBody;
   shipBodyDef.position = (b3Pos){shipPos.x, shipPos.y, shipPos.z};
   b3BodyId shipBodyId = b3CreateBody(worldId, &shipBodyDef);
+  b3MotionLocks shipBodyLocks = {0};
+  shipBodyLocks.angularX = true;
+  shipBodyLocks.angularY = true;
+  shipBodyLocks.angularZ = true;
+  b3Body_SetMotionLocks (shipBodyId, shipBodyLocks);
   b3BoxHull shipStaticBox = b3MakeBoxHull(shipSize.x * 0.5f, shipSize.y * 0.5f, shipSize.z * 0.5f);
   b3ShapeDef shipShapeDef = b3DefaultShapeDef();
-  shipShapeDef.density = 1.0f; // Set the box density to be non-zero, so it will be dynamic.
+  shipShapeDef.baseMaterial.restitution = 0.0f;
+  shipShapeDef.baseMaterial.friction = 0.2f;
+  shipShapeDef.density = 20.0f; // Set the box density to be non-zero, so it will be dynamic.
+
   b3CreateHullShape(shipBodyId, &shipShapeDef, &shipStaticBox.base);
 
   // Prepare for simulation. Typically we use a time step of 1/60 of a
@@ -192,13 +205,14 @@ int main() {
   SetTargetFPS(60);
 
   Camera3D camera = {0};
-  camera.position = (Vector3){5.5f, 6.0f, 20.0f};
-  camera.target = (Vector3){5.5f, 1.0f, 1.0f};
+  camera.position = (Vector3){5.5f, 6.0f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
+  camera.target = (Vector3){5.5f, 1.0f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
   camera.fovy = 60.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  b3Vec3 shipForce = {0.0f, 0.0f, -10.0f};
+  b3Vec3 engineForce = {0.0f, 0.0f, 0.0f},
+         lateralForce = {0.0f, 0.0f, 0.0f};
 
   loadLevel(1);
   for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
@@ -206,7 +220,31 @@ int main() {
   }
 
   while (!WindowShouldClose()) {
-    b3Body_ApplyForceToCenter(shipBodyId, shipForce, true);
+
+    if (IsKeyDown(KEY_LEFT)) {
+      lateralForce.x = -300.0f;
+    } else if (IsKeyDown(KEY_RIGHT)) {
+      lateralForce.x = 300.0f;
+    } else {
+      lateralForce.x = 0.0f;
+    }
+
+    if (IsKeyDown(KEY_UP)) {
+      engineForce.z = -300.0f;
+    } else if (IsKeyDown(KEY_DOWN)) {
+      engineForce.z = 20.0f;
+    }
+
+    if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
+      engineForce.z = 0.0f;
+    }
+
+    if (IsKeyDown(KEY_SPACE)) {
+      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 1000.0f, 0.0f}, true);
+    }
+
+    b3Body_ApplyForceToCenter(shipBodyId, engineForce, true);
+    b3Body_ApplyForceToCenter(shipBodyId, lateralForce, true);
     b3World_Step(worldId, timeStep, subStepCount);
     b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
 
@@ -219,6 +257,9 @@ int main() {
              shipSize.x, shipSize.y, shipSize.z, GREEN);
     DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
                   shipSize.x, shipSize.y, shipSize.z, BLACK);
+
+    camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
+    camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
 
     for (int i = currentSegmentIdx; i < MIN(currentSegmentIdx + MAX_VISIBLE_SEGMENTS, totalSegments); i++ ) {
       for (int j = 0; j < segments[i].totalLanes; j++) {
