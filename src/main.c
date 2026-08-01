@@ -169,32 +169,111 @@ void initNextVisibleSegment(b3WorldId worldId) {
   initSegment(nextSegmentIdx, worldId);
 }
 
+b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize)
+{
+  b3BodyDef shipBodyDef = b3DefaultBodyDef();
+  shipBodyDef.type = b3_dynamicBody;
+  shipBodyDef.position = (b3Pos){
+    shipPos.x,
+    shipPos.y,
+    shipPos.z
+  };
+
+  b3BodyId shipBodyId = b3CreateBody(worldId, &shipBodyDef);
+  b3MotionLocks shipBodyLocks = {0};
+
+  shipBodyLocks.angularX = true;
+  shipBodyLocks.angularY = true;
+  shipBodyLocks.angularZ = true;
+
+  b3Body_SetMotionLocks(shipBodyId, shipBodyLocks);
+  b3ShapeDef shipShapeDef = b3DefaultShapeDef();
+
+  shipShapeDef.enableContactEvents = true;
+  shipShapeDef.enableHitEvents = true;
+  shipShapeDef.baseMaterial.restitution = 0.0f;
+  shipShapeDef.baseMaterial.friction = 0.2f;
+  shipShapeDef.density = 20.0f;
+
+  b3BoxHull shipBox = b3MakeBoxHull(
+    shipSize.x * 0.5f,
+    shipSize.y * 0.5f,
+    shipSize.z * 0.5f
+  );
+
+  b3CreateHullShape(
+    shipBodyId,
+    &shipShapeDef,
+    &shipBox.base
+  );
+
+  float sphereRadius = 0.15f;
+  float offsetX = shipSize.x * 0.30f;
+  float offsetZ = shipSize.z * 0.30f;
+  float offsetY = -shipSize.y * 0.50f;
+
+  b3Sphere sphere;
+  sphere.radius = sphereRadius;
+  sphere.center = (b3Vec3){
+    -offsetX,
+    offsetY,
+    -offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  sphere.center = (b3Vec3){
+    offsetX,
+    offsetY,
+    -offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  sphere.center = (b3Vec3){
+    -offsetX,
+    offsetY,
+    offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  sphere.center = (b3Vec3){
+    offsetX,
+    offsetY,
+    offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  return shipBodyId;
+}
+
 int main() {
   b3WorldDef worldDef = b3DefaultWorldDef();
   worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
   worldDef.restitutionThreshold = 0.1f;
   b3WorldId worldId = b3CreateWorld(&worldDef);
 
-  Vector3 shipSize = (Vector3){1.0f, 1.0f, 1.0f};
   Vector3 shipPos = (Vector3){5.5f, 1.5f, 10.0f};
-
-  b3BodyDef shipBodyDef = b3DefaultBodyDef();
-  shipBodyDef.type = b3_dynamicBody;
-  shipBodyDef.position = (b3Pos){shipPos.x, shipPos.y, shipPos.z};
-  b3BodyId shipBodyId = b3CreateBody(worldId, &shipBodyDef);
-  b3MotionLocks shipBodyLocks = {0};
-  shipBodyLocks.angularX = true;
-  shipBodyLocks.angularY = true;
-  shipBodyLocks.angularZ = true;
-  b3Body_SetMotionLocks (shipBodyId, shipBodyLocks);
-  b3BoxHull shipStaticBox = b3MakeBoxHull(shipSize.x * 0.5f, shipSize.y * 0.5f, shipSize.z * 0.5f);
-  b3ShapeDef shipShapeDef = b3DefaultShapeDef();
-  shipShapeDef.enableContactEvents = true;
-  shipShapeDef.enableHitEvents = true;
-  shipShapeDef.baseMaterial.restitution = 0.0f;
-  shipShapeDef.baseMaterial.friction = 0.2f;
-  shipShapeDef.density = 20.0f; // Set the box density to be non-zero, so it will be dynamic.
-  b3CreateHullShape(shipBodyId, &shipShapeDef, &shipStaticBox.base);
+  Vector3 shipSize = (Vector3){1.0f, 1.0f, 1.0f};
+  b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
 
   b3ContactEvents events;
 
@@ -245,7 +324,7 @@ int main() {
     }
 
     if (IsKeyPressed(KEY_SPACE)) {
-      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 20000.0f, 0.0f}, true);
+      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 25000.0f, 0.0f}, true);
     }
 
     b3Body_ApplyForceToCenter(shipBodyId, engineForce, true);
@@ -291,7 +370,6 @@ int main() {
         }
       }
     }
-
 
     b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
 
