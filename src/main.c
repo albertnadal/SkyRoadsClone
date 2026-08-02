@@ -7,7 +7,7 @@
 #include <string.h>
 
 #define MAX_SEGMENTS_PER_LEVEL 100
-#define MAX_LANES_PER_SEGMENT 100
+#define MAX_ROAD_OBJECTS_PER_SEGMENT 100
 #define MAX_VISIBLE_SEGMENTS 2
 #define DISTANCE_BETWEEN_SHIP_AND_CAMERA 10.0f
 #define CAMERA_TARGET_Z_DISTANCE 19.0f
@@ -20,17 +20,25 @@ static const float SCR_WIDTH = 640.0f;
 static const float SCR_HEIGHT = 480.0f;
 static const char *WINDOW_TITLE = "SkyRoads Clone";
 
+typedef enum {
+    SR_ROAD_OBJECT_NONE = 0,
+    SR_ROAD_OBJECT_LANE = 1,
+    SR_ROAD_OBJECT_TUNNEL = 2
+} srRoadObjectType;
+
 typedef struct {
   Vector3 initialPosition;
   Vector3 size;
   Color color;
+  srRoadObjectType type;
   b3BodyId box3DBodyId;
+  Model model;
   bool isLast;
-} srLane;
+} srRoadObject;
 
 typedef struct {
-  int totalLanes;
-  srLane lanes[MAX_LANES_PER_SEGMENT];
+  int totalRoadObjects;
+  srRoadObject roadObjects[MAX_ROAD_OBJECTS_PER_SEGMENT];
 } srRoadSegment;
 
 int totalSegments = 0;
@@ -63,25 +71,25 @@ void loadLevel(int level) {
       continue;
 
     if (*p == '#') {
-        if (currentRoadSegment != NULL && currentRoadSegment->totalLanes > 0) {
-            currentRoadSegment->lanes[currentRoadSegment->totalLanes - 1].isLast = true;
+        if (currentRoadSegment != NULL && currentRoadSegment->totalRoadObjects > 0) {
+            currentRoadSegment->roadObjects[currentRoadSegment->totalRoadObjects - 1].isLast = true;
         }
 
         assert(totalSegments < MAX_SEGMENTS_PER_LEVEL &&
                "Reached the max number of segments allowed per level.");
 
         currentRoadSegment = &segments[totalSegments];
-        currentRoadSegment->totalLanes = 0;
+        currentRoadSegment->totalRoadObjects = 0;
         totalSegments++;
 
         continue;
     }
 
     assert(currentRoadSegment != NULL &&
-           "No first segment is defined before defining lanes.");
+           "No first segment is defined before defining road objects.");
 
-    assert(currentRoadSegment->totalLanes < MAX_LANES_PER_SEGMENT &&
-           "Reached the max number of lanes allowed per segment.");
+    assert(currentRoadSegment->totalRoadObjects < MAX_ROAD_OBJECTS_PER_SEGMENT &&
+           "Reached the max number of road objects allowed per segment.");
 
     float px, py, pz;
     float sx, sy, sz;
@@ -90,180 +98,78 @@ void loadLevel(int level) {
     int parsed = sscanf(p, "%f,%f,%f,%f,%f,%f,%d,%d", &px, &py, &pz, &sx, &sy,
                         &sz, &colorValue, &type);
 
-    assert(parsed == 8 && "Found a lane with an invalid number of parameters. "
-                          "Lanes must have 8 parameters.");
+    assert(parsed == 8 && "Found a road object with an invalid number of parameters. "
+                          "Road objects must have 8 parameters.");
 
-    srLane *lane = &currentRoadSegment->lanes[currentRoadSegment->totalLanes];
+    srRoadObject *obj = &currentRoadSegment->roadObjects[currentRoadSegment->totalRoadObjects];
 
-    lane->initialPosition = (Vector3){px, py, pz};
-    lane->size = (Vector3){sx, sy, sz};
+    obj->initialPosition = (Vector3){px, py, pz};
+    obj->size = (Vector3){sx, sy, sz};
+    obj->type = (srRoadObjectType)type;
 
     switch (colorValue) {
     case 0:
-      lane->color = BLACK;
+      obj->color = BLACK;
       break;
     case 1:
-      lane->color = BLUE;
+      obj->color = BLUE;
       break;
     case 2:
-      lane->color = RED;
+      obj->color = RED;
       break;
     case 3:
-      lane->color = GREEN;
+      obj->color = GREEN;
       break;
     case 4:
-      lane->color = YELLOW;
+      obj->color = YELLOW;
       break;
     case 5:
-      lane->color = ORANGE;
+      obj->color = ORANGE;
       break;
     case 6:
-      lane->color = PURPLE;
+      obj->color = PURPLE;
       break;
     case 7:
-      lane->color = PINK;
+      obj->color = PINK;
       break;
     case 8:
-      lane->color = WHITE;
+      obj->color = WHITE;
       break;
     case 9:
-      lane->color = GRAY;
+      obj->color = GRAY;
       break;
     case 10:
-      lane->color = BROWN;
+      obj->color = BROWN;
       break;
     default:
-      lane->color = WHITE;
+      obj->color = WHITE;
       break;
     }
 
-    memset(&lane->box3DBodyId, 0, sizeof(lane->box3DBodyId));
-    lane->isLast = false;
-    currentRoadSegment->totalLanes++;
+    memset(&obj->box3DBodyId, 0, sizeof(obj->box3DBodyId));
+    obj->isLast = false;
+    currentRoadSegment->totalRoadObjects++;
   }
 
-  if (currentRoadSegment != NULL && currentRoadSegment->totalLanes > 0) {
-      currentRoadSegment->lanes[currentRoadSegment->totalLanes - 1].isLast = true;
+  if (currentRoadSegment != NULL && currentRoadSegment->totalRoadObjects > 0) {
+      currentRoadSegment->roadObjects[currentRoadSegment->totalRoadObjects - 1].isLast = true;
   }
 
   fclose(fp);
 }
 
-void initSegment(int segmentIdx, b3WorldId worldId) {
-  for (int j = 0; j < segments[segmentIdx].totalLanes; j++) {
-    srLane *lane = &segments[segmentIdx].lanes[j];
-    b3BodyDef laneBodyDef = b3DefaultBodyDef();
-    laneBodyDef.type = b3_staticBody;
-    laneBodyDef.position = (b3Pos){lane->initialPosition.x, lane->initialPosition.y, lane->initialPosition.z};
-    lane->box3DBodyId = b3CreateBody(worldId, &laneBodyDef);
-    b3BoxHull laneStaticBox = b3MakeBoxHull(lane->size.x * 0.5f, lane->size.y * 0.5f, lane->size.z * 0.5f);
-    b3ShapeDef laneShapeDef = b3DefaultShapeDef();
-    laneShapeDef.baseMaterial.restitution = 0.02f;
-    laneShapeDef.baseMaterial.friction = 0.2f;
-    laneShapeDef.density = 10.0f; // Set the box density to be non-zero, so it will be dynamic.
-    b3CreateHullShape(lane->box3DBodyId, &laneShapeDef, &laneStaticBox.base);
-  }
-}
-
-void initNextVisibleSegment(b3WorldId worldId) {
-  int nextSegmentIdx = MAX_VISIBLE_SEGMENTS - currentSegmentIdx;
-  initSegment(nextSegmentIdx, worldId);
-}
-
-b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize)
-{
-  b3BodyDef shipBodyDef = b3DefaultBodyDef();
-  shipBodyDef.type = b3_dynamicBody;
-  shipBodyDef.position = (b3Pos){
-    shipPos.x,
-    shipPos.y,
-    shipPos.z
-  };
-
-  b3BodyId shipBodyId = b3CreateBody(worldId, &shipBodyDef);
-  b3MotionLocks shipBodyLocks = {0};
-
-  shipBodyLocks.angularX = true;
-  shipBodyLocks.angularY = true;
-  shipBodyLocks.angularZ = true;
-
-  b3Body_SetMotionLocks(shipBodyId, shipBodyLocks);
-  b3ShapeDef shipShapeDef = b3DefaultShapeDef();
-
-  shipShapeDef.enableContactEvents = true;
-  shipShapeDef.enableHitEvents = true;
-  shipShapeDef.baseMaterial.restitution = 0.0f;
-  shipShapeDef.baseMaterial.friction = 0.2f;
-  shipShapeDef.density = 20.0f;
-
-  b3BoxHull shipBox = b3MakeBoxHull(
-    shipSize.x * 0.5f,
-    shipSize.y * 0.5f,
-    shipSize.z * 0.5f
-  );
-
-  b3CreateHullShape(
-    shipBodyId,
-    &shipShapeDef,
-    &shipBox.base
-  );
-
-  float sphereRadius = 0.15f;
-  float offsetX = shipSize.x * 0.30f;
-  float offsetZ = shipSize.z * 0.30f;
-  float offsetY = -shipSize.y * 0.50f;
-
-  b3Sphere sphere;
-  sphere.radius = sphereRadius;
-  sphere.center = (b3Vec3){
-    -offsetX,
-    offsetY,
-    -offsetZ
-  };
-
-  b3CreateSphereShape(
-    shipBodyId,
-    &shipShapeDef,
-    &sphere
-  );
-
-  sphere.center = (b3Vec3){
-    offsetX,
-    offsetY,
-    -offsetZ
-  };
-
-  b3CreateSphereShape(
-    shipBodyId,
-    &shipShapeDef,
-    &sphere
-  );
-
-  sphere.center = (b3Vec3){
-    -offsetX,
-    offsetY,
-    offsetZ
-  };
-
-  b3CreateSphereShape(
-    shipBodyId,
-    &shipShapeDef,
-    &sphere
-  );
-
-  sphere.center = (b3Vec3){
-    offsetX,
-    offsetY,
-    offsetZ
-  };
-
-  b3CreateSphereShape(
-    shipBodyId,
-    &shipShapeDef,
-    &sphere
-  );
-
-  return shipBodyId;
+b3BodyId createLaneBody(b3WorldId worldId, Vector3 lanePos, Vector3 laneSize) {
+  b3BodyDef laneBodyDef = b3DefaultBodyDef();
+  laneBodyDef.type = b3_staticBody;
+  laneBodyDef.position = (b3Pos){lanePos.x, lanePos.y, lanePos.z};
+  b3BodyId bodyId = b3CreateBody(worldId, &laneBodyDef);
+  b3BoxHull laneStaticBox = b3MakeBoxHull(laneSize.x * 0.5f, laneSize.y * 0.5f, laneSize.z * 0.5f);
+  b3ShapeDef laneShapeDef = b3DefaultShapeDef();
+  laneShapeDef.baseMaterial.restitution = 0.02f;
+  laneShapeDef.baseMaterial.friction = 0.2f;
+  laneShapeDef.density = 10.0f; // Set the box density to be non-zero, so it will be dynamic.
+  b3CreateHullShape(bodyId, &laneShapeDef, &laneStaticBox.base);
+  return bodyId;
 }
 
 b3BodyId createTunnelBody(b3WorldId worldId, Vector3 tunnelPos, Vector3 tunnelSize) {
@@ -375,6 +281,122 @@ Model createTunnelModel(Vector3 tunnelSize) {
   return model;
 }
 
+void initSegment(int segmentIdx, b3WorldId worldId) {
+  for (int j = 0; j < segments[segmentIdx].totalRoadObjects; j++) {
+    srRoadObject *obj = &segments[segmentIdx].roadObjects[j];
+
+    if(obj->type == SR_ROAD_OBJECT_LANE) {
+      obj->box3DBodyId = createLaneBody(worldId, obj->initialPosition, obj->size);
+    } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
+      obj->box3DBodyId = createTunnelBody(worldId, obj->initialPosition, obj->size);
+      obj->model = createTunnelModel(obj->size);
+    } else {
+      assert(false && "Unknown road object type specified in the level data file.");
+    }
+  }
+}
+
+void initNextVisibleSegment(b3WorldId worldId) {
+  int nextSegmentIdx = MAX_VISIBLE_SEGMENTS - currentSegmentIdx;
+  initSegment(nextSegmentIdx, worldId);
+}
+
+b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize)
+{
+  b3BodyDef shipBodyDef = b3DefaultBodyDef();
+  shipBodyDef.type = b3_dynamicBody;
+  shipBodyDef.position = (b3Pos){
+    shipPos.x,
+    shipPos.y,
+    shipPos.z
+  };
+
+  b3BodyId shipBodyId = b3CreateBody(worldId, &shipBodyDef);
+  b3MotionLocks shipBodyLocks = {0};
+
+  shipBodyLocks.angularX = true;
+  shipBodyLocks.angularY = true;
+  shipBodyLocks.angularZ = true;
+
+  b3Body_SetMotionLocks(shipBodyId, shipBodyLocks);
+  b3ShapeDef shipShapeDef = b3DefaultShapeDef();
+
+  shipShapeDef.enableContactEvents = true;
+  shipShapeDef.enableHitEvents = true;
+  shipShapeDef.baseMaterial.restitution = 0.0f;
+  shipShapeDef.baseMaterial.friction = 0.2f;
+  shipShapeDef.density = 20.0f;
+
+  b3BoxHull shipBox = b3MakeBoxHull(
+    shipSize.x * 0.5f,
+    shipSize.y * 0.5f,
+    shipSize.z * 0.5f
+  );
+
+  b3CreateHullShape(
+    shipBodyId,
+    &shipShapeDef,
+    &shipBox.base
+  );
+
+  float sphereRadius = 0.15f;
+  float offsetX = shipSize.x * 0.30f;
+  float offsetZ = shipSize.z * 0.30f;
+  float offsetY = -shipSize.y * 0.50f;
+
+  b3Sphere sphere;
+  sphere.radius = sphereRadius;
+  sphere.center = (b3Vec3){
+    -offsetX,
+    offsetY,
+    -offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  sphere.center = (b3Vec3){
+    offsetX,
+    offsetY,
+    -offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  sphere.center = (b3Vec3){
+    -offsetX,
+    offsetY,
+    offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  sphere.center = (b3Vec3){
+    offsetX,
+    offsetY,
+    offsetZ
+  };
+
+  b3CreateSphereShape(
+    shipBodyId,
+    &shipShapeDef,
+    &sphere
+  );
+
+  return shipBodyId;
+}
+
 static Vector3 rotateAroundZ(Vector3 p, float angle) {
   float c = cosf(angle);
   float s = sinf(angle);
@@ -453,10 +475,6 @@ int main() {
   Vector3 shipSize = (Vector3){1.0f, 1.0f, 1.0f};
   b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
 
-  Vector3 tunnelPos = (Vector3){6.0f, 0.7f, -5.0f};
-  Vector3 tunnelSize = (Vector3){3.0f, 3.0f, 10.0f};
-  b3BodyId tunnelBodyId = createTunnelBody(worldId, tunnelPos, tunnelSize);
-
   b3ContactEvents events;
 
   // Prepare for simulation. Typically we use a time step of 1/60 of a
@@ -482,8 +500,6 @@ int main() {
   for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
     initSegment(s, worldId);
   }
-
-  Model tunnelModel = createTunnelModel(tunnelSize);
 
   bool shipOnGround = false;
 
@@ -567,18 +583,21 @@ int main() {
     DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z},
                   shipSize.x, shipSize.y, shipSize.z, BLACK);
 
-    DrawModel(tunnelModel, tunnelPos, 1.0f, PINK);
-    drawTunnelWires(tunnelPos, tunnelSize, BLACK);
-
     camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
     camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
 
     for (int i = currentSegmentIdx; i < MIN(currentSegmentIdx + MAX_VISIBLE_SEGMENTS, totalSegments); i++ ) {
-      for (int j = 0; j < segments[i].totalLanes; j++) {
-        srLane *lane = &segments[i].lanes[j];
-        b3Pos pos = b3Body_GetPosition(lane->box3DBodyId);
-        DrawCube((Vector3){pos.x, pos.y, pos.z}, lane->size.x, lane->size.y, lane->size.z, lane->color);
-        DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, lane->size.x, lane->size.y, lane->size.z, BLACK);
+      for (int j = 0; j < segments[i].totalRoadObjects; j++) {
+        srRoadObject *obj = &segments[i].roadObjects[j];
+        b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
+
+        if(obj->type == SR_ROAD_OBJECT_LANE) {
+          DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
+          DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
+        } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
+          DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
+          drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
+        }
       }
     }
 
