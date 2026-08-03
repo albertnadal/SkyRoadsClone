@@ -87,13 +87,6 @@ int main() {
   Texture2D background = LoadTexture("images/level1.png");
   Rectangle bgSize = {0, 0, (float)background.width, (float)background.height};
 
-  Camera3D camera = {0};
-  camera.position = (Vector3){5.5f, 7.5f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
-  camera.target = (Vector3){5.5f, 2.5f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
-  camera.up = (Vector3){0.0f, 1.0f, 0.0f};
-  camera.fovy = 40.0f;
-  camera.projection = CAMERA_PERSPECTIVE;
-
   b3WorldDef worldDef = b3DefaultWorldDef();
   worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
   worldDef.restitutionThreshold = 0.1f;
@@ -120,6 +113,13 @@ int main() {
   for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
     initSegment(s, worldId);
   }
+
+  Camera3D camera = {0};
+  camera.position = (Vector3){5.5f, 7.5f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
+  camera.target = (Vector3){5.5f, 2.5f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
+  camera.up = (Vector3){0.0f, 1.0f, 0.0f};
+  camera.fovy = 40.0f;
+  camera.projection = CAMERA_PERSPECTIVE;
 
   while (!WindowShouldClose()) {
 
