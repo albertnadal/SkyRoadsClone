@@ -100,7 +100,7 @@ int main() {
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
-  Texture2D background = LoadTexture("images/level5.png");
+  Texture2D background = LoadTexture("images/level1.png");
   Rectangle bgSize = {0, 0, (float)background.width, (float)background.height};
 
   Camera3D camera = {0};
