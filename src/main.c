@@ -49,7 +49,7 @@ b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize)
   shipShapeDef.enableHitEvents = true;
   shipShapeDef.baseMaterial.restitution = 0.0f;
   shipShapeDef.baseMaterial.friction = 0.2f;
-  shipShapeDef.density = 20.0f;
+  shipShapeDef.density = 200.0f;
 
   b3BoxHull shipBox = b3MakeBoxHull(shipSize.x * 0.5f, shipSize.y * 0.5f, shipSize.z * 0.5f);
   b3CreateHullShape(shipBodyId, &shipShapeDef, &shipBox.base);
@@ -118,17 +118,17 @@ int main() {
   while (!WindowShouldClose()) {
 
     if (IsKeyDown(KEY_LEFT)) {
-      lateralForce.x = -300.0f;
+      lateralForce.x = -1500.0f;
     } else if (IsKeyDown(KEY_RIGHT)) {
-      lateralForce.x = 300.0f;
+      lateralForce.x = 1500.0f;
     } else {
       lateralForce.x = 0.0f;
     }
 
     if (IsKeyDown(KEY_UP)) {
-      engineForce.z = -300.0f;
+      engineForce.z = -2000.0f;
     } else if (IsKeyDown(KEY_DOWN)) {
-      engineForce.z = 20.0f;
+      engineForce.z = 200.0f;
     }
 
     if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
@@ -136,7 +136,7 @@ int main() {
     }
 
     if (IsKeyPressed(KEY_SPACE)) {
-      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 25000.0f, 0.0f}, true);
+      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
     }
 
     b3Body_ApplyForceToCenter(shipBodyId, engineForce, true);
