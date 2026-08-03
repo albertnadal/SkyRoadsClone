@@ -97,9 +97,15 @@ int main() {
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(60);
 
+  RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
+  SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
+
+  Texture2D background = LoadTexture("images/level5.png");
+  Rectangle bgSize = {0, 0, (float)background.width, (float)background.height};
+
   Camera3D camera = {0};
   camera.position = (Vector3){5.5f, 7.5f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
-  camera.target = (Vector3){5.5f, 1.0f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
+  camera.target = (Vector3){5.5f, 2.5f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
   camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
@@ -185,8 +191,10 @@ int main() {
 
     b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
 
-    BeginDrawing();
+    BeginTextureMode(target);
     ClearBackground(BLACK);
+    DrawTexturePro(background, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
+
     BeginMode3D(camera);
     //DrawGrid(80, 1.0f);
 
@@ -224,12 +232,24 @@ int main() {
 
     EndMode3D();
     DrawFPS(16, 16);
+    EndTextureMode();
+
+    BeginDrawing();
+    DrawTexturePro(
+        target.texture,
+        (Rectangle){0, 0, RES_WIDTH, -RES_HEIGHT},
+        (Rectangle){0, 0, SCR_WIDTH, SCR_HEIGHT},
+        (Vector2){0,0},
+        0.0f,
+        WHITE
+    );
     EndDrawing();
     // IF Z position of the Ship is higher than the Z position of the last lane of the current segment then 
     // call the function initNextVisibleSegment(worldId) to load the bodies of the next visible segment.
   }
 
   UnloadModel(shipModel);
+  UnloadTexture(background);
   CloseWindow();
   b3DestroyWorld(worldId);
   return 0;

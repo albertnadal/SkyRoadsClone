@@ -18,8 +18,10 @@
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-static const float SCR_WIDTH  = 800.0f;
-static const float SCR_HEIGHT = 600.0f;
+static const float SCR_WIDTH  = 1280.0f;
+static const float SCR_HEIGHT = 800.0f;
+static const float RES_WIDTH  = 1280.0f; //320
+static const float RES_HEIGHT = 800.0f; //200
 static const char WINDOW_TITLE[] = "SkyRoads Clone";
 
 typedef enum {
