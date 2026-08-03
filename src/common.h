@@ -5,20 +5,21 @@
 #include <raylib/raylib.h>
 #include <box3d/box3d.h>
 
+#define DEBUG true
 #define MAX_SEGMENTS_PER_LEVEL 100
 #define MAX_ROAD_OBJECTS_PER_SEGMENT 100
 #define MAX_VISIBLE_SEGMENTS 2
-#define DISTANCE_BETWEEN_SHIP_AND_CAMERA 10.0f
+#define DISTANCE_BETWEEN_SHIP_AND_CAMERA 15.0f
 #define CAMERA_TARGET_Z_DISTANCE 19.0f
-#define GRAVITY (4.0f * -9.80665f)
+#define GRAVITY (8.0f * -9.80665f)
 #define TUNNEL_SLICES 9
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-static const float SCR_WIDTH  = 640.0f;
-static const float SCR_HEIGHT = 480.0f;
+static const float SCR_WIDTH  = 800.0f;
+static const float SCR_HEIGHT = 600.0f;
 static const char WINDOW_TITLE[] = "SkyRoads Clone";
 
 typedef enum {

@@ -83,7 +83,7 @@ int main() {
   b3WorldId worldId = b3CreateWorld(&worldDef);
 
   Vector3 shipPos = (Vector3){5.5f, 1.5f, 10.0f};
-  Vector3 shipSize = (Vector3){1.0f, 1.0f, 1.0f};
+  Vector3 shipSize = (Vector3){1.33f, 0.5f, 0.7f};
   b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
 
   b3ContactEvents events;
@@ -98,10 +98,10 @@ int main() {
   SetTargetFPS(60);
 
   Camera3D camera = {0};
-  camera.position = (Vector3){5.5f, 6.0f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
+  camera.position = (Vector3){5.5f, 7.5f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
   camera.target = (Vector3){5.5f, 1.0f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
-  camera.fovy = 70.0f;
+  camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
   b3Vec3 engineForce = {0.0f, 0.0f, 0.0f},
@@ -112,6 +112,7 @@ int main() {
     initSegment(s, worldId);
   }
 
+  Model shipModel = LoadModel("models/ship.glb");
   bool shipOnGround = false;
 
   while (!WindowShouldClose()) {
@@ -189,8 +190,19 @@ int main() {
     BeginMode3D(camera);
     //DrawGrid(80, 1.0f);
 
-    DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
-    DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
+    DrawModelEx(
+      shipModel,
+      (Vector3){shipPosition.x, shipPosition.y - 0.25f, shipPosition.z},
+      (Vector3){0.0f, 0.0f, 0.0f},
+      0.0f,
+      (Vector3){0.3f, 0.3f, 0.3f},
+      WHITE
+    );
+
+    //DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
+    if (DEBUG) {
+      DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
+    }
 
     camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
     camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
@@ -217,6 +229,7 @@ int main() {
     // call the function initNextVisibleSegment(worldId) to load the bodies of the next visible segment.
   }
 
+  UnloadModel(shipModel);
   CloseWindow();
   b3DestroyWorld(worldId);
   return 0;
