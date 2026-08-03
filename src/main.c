@@ -77,23 +77,7 @@ b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize)
 }
 
 int main() {
-  b3WorldDef worldDef = b3DefaultWorldDef();
-  worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
-  worldDef.restitutionThreshold = 0.1f;
-  b3WorldId worldId = b3CreateWorld(&worldDef);
-
-  Vector3 shipPos = (Vector3){5.5f, 1.5f, 10.0f};
-  Vector3 shipSize = (Vector3){1.33f, 0.5f, 0.7f};
-  b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
-
-  b3ContactEvents events;
-
-  // Prepare for simulation. Typically we use a time step of 1/60 of a
-  // second (60Hz) and 4 sub-steps. This provides a high quality simulation
-  // in most game scenarios.
-  float timeStep = 1.0f / 60.0f;
-  int subStepCount = 4;
-
+  SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(60);
 
@@ -110,46 +94,63 @@ int main() {
   camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  b3Vec3 engineForce = {0.0f, 0.0f, 0.0f},
-         lateralForce = {0.0f, 0.0f, 0.0f};
+  b3WorldDef worldDef = b3DefaultWorldDef();
+  worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
+  worldDef.restitutionThreshold = 0.1f;
+  b3WorldId worldId = b3CreateWorld(&worldDef);
+
+  Vector3 shipPos = (Vector3){5.5f, 1.5f, 10.0f};
+  Vector3 shipSize = (Vector3){1.33f, 0.5f, 0.7f};
+  b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
+  b3Pos shipPosition;
+  b3Vec3 shipSpeed;
+  b3Vec3 shipEngineForce = {0.0f, 0.0f, 0.0f},
+         shipLateralForce = {0.0f, 0.0f, 0.0f};
+  Model shipModel = LoadModel("models/ship.glb");
+  bool shipOnGround = false;
+  b3ContactEvents events;
+
+  // Prepare for simulation. Typically we use a time step of 1/60 of a
+  // second (60Hz) and 4 sub-steps. This provides a high quality simulation
+  // in most game scenarios.
+  float timeStep = 1.0f / 60.0f;
+  int subStepCount = 4;
 
   loadLevel(1);
   for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
     initSegment(s, worldId);
   }
 
-  Model shipModel = LoadModel("models/ship.glb");
-  bool shipOnGround = false;
-
   while (!WindowShouldClose()) {
 
     if (IsKeyDown(KEY_LEFT)) {
-      lateralForce.x = -1500.0f;
+      shipLateralForce.x = -1500.0f;
     } else if (IsKeyDown(KEY_RIGHT)) {
-      lateralForce.x = 1500.0f;
+      shipLateralForce.x = 1500.0f;
     } else {
-      lateralForce.x = 0.0f;
+      shipLateralForce.x = 0.0f;
     }
 
     if (IsKeyDown(KEY_UP)) {
-      engineForce.z = -2000.0f;
+      shipEngineForce.z = -2000.0f;
     } else if (IsKeyDown(KEY_DOWN)) {
-      engineForce.z = 200.0f;
+      shipEngineForce.z = 200.0f;
     }
 
     if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
-      engineForce.z = 0.0f;
+      shipEngineForce.z = 0.0f;
     }
 
     if (IsKeyPressed(KEY_SPACE)) {
       b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
     }
 
-    b3Body_ApplyForceToCenter(shipBodyId, engineForce, true);
-    b3Body_ApplyForceToCenter(shipBodyId, lateralForce, true);
+    b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
+    b3Body_ApplyForceToCenter(shipBodyId, shipLateralForce, true);
 
     b3World_Step(worldId, timeStep, subStepCount);
     events = b3World_GetContactEvents(worldId);
+    shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
     for(int i = 0; i < events.hitCount; i++) {
       b3ContactHitEvent *hit = &events.hitEvents[i];
@@ -189,14 +190,13 @@ int main() {
       }
     }
 
-    b3Pos shipPosition = b3Body_GetPosition(shipBodyId);
+    shipPosition = b3Body_GetPosition(shipBodyId);
 
     BeginTextureMode(target);
     ClearBackground(BLACK);
     DrawTexturePro(background, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
 
     BeginMode3D(camera);
-    //DrawGrid(80, 1.0f);
 
     DrawModelEx(
       shipModel,
