@@ -90,6 +90,7 @@ int main() {
 
   Texture2D background = LoadTexture("images/level1.png");
   Rectangle bgSize = {0, 0, (float)background.width, (float)background.height};
+  Texture2D hudPanel = LoadTexture("images/hud_panel.png");
 
   b3WorldDef worldDef = b3DefaultWorldDef();
   worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
@@ -259,6 +260,10 @@ int main() {
 
     EndMode3D();
     DrawFPS(16, 16);
+
+    int hudX = (SCR_WIDTH - hudPanel.width) / 2;
+    int hudY = SCR_HEIGHT - hudPanel.height - 20;
+    DrawTexture(hudPanel, hudX, hudY, WHITE);
     EndTextureMode();
 
     BeginDrawing();
