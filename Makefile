@@ -25,7 +25,8 @@ SRC = \
 	src/main.c \
 	src/level.c \
 	src/lane.c \
-	src/tunnel.c
+	src/tunnel.c \
+	src/explosion.c
 
 OBJ = $(SRC:.c=.o)
 

@@ -28,7 +28,7 @@ static Color getColorFromId(int colorId) {
 
 void loadLevel(int level) {
   char filename[64];
-  snprintf(filename, sizeof(filename), "level%d.dat", level);
+  snprintf(filename, sizeof(filename), "levels/level%d.dat", level);
 
   FILE *fp = fopen(filename, "r");
   assert(fp != NULL && "The file with the level data does not exist.");

@@ -13,6 +13,7 @@
 #define CAMERA_TARGET_Z_DISTANCE 19.0f
 #define GRAVITY 3 * -9.80665f
 #define TUNNEL_SLICES 9
+#define EXPLOSION_SPHERES_COUNT 50
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -44,5 +45,13 @@ typedef struct {
   int totalRoadObjects;
   srRoadObject roadObjects[MAX_ROAD_OBJECTS_PER_SEGMENT];
 } srRoadSegment;
+
+typedef struct {
+  Vector3 initialPosition;
+  float radius;
+  Color color;
+  unsigned char alpha;
+  b3BodyId box3DBodyId;
+} srExplosionSphere;
 
 #endif

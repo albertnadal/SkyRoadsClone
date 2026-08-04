@@ -1,13 +1,18 @@
 #include <assert.h>
 #include <stdio.h>
+//#include <stdlib.h>
 #include "common.h"
 #include "level.h"
 #include "lane.h"
 #include "tunnel.h"
+#include "explosion.h"
 
 int totalSegments;
 int currentSegmentIdx;
-srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL];
+srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL] = {0};
+srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
+bool shipIsExploding = false;
+bool shipOnGround = false;
 
 void initSegment(int segmentIdx, b3WorldId worldId) {
   for (int j = 0; j < segments[segmentIdx].totalRoadObjects; j++) {
@@ -29,8 +34,7 @@ void initNextVisibleSegment(b3WorldId worldId) {
   initSegment(nextSegmentIdx, worldId);
 }
 
-b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize)
-{
+b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize) {
   b3BodyDef shipBodyDef = b3DefaultBodyDef();
   shipBodyDef.type = b3_dynamicBody;
   shipBodyDef.position = (b3Pos){shipPos.x, shipPos.y, shipPos.z};
@@ -96,11 +100,10 @@ int main() {
   Vector3 shipSize = (Vector3){1.33f, 0.5f, 0.7f};
   b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
   b3Pos shipPosition;
-  b3Vec3 shipSpeed;
+  b3Vec3 shipSpeed, prevShipSpeed;
   b3Vec3 shipEngineForce = {0.0f, 0.0f, 0.0f},
          shipLateralForce = {0.0f, 0.0f, 0.0f};
   Model shipModel = LoadModel("models/ship.glb");
-  bool shipOnGround = false;
   b3ContactEvents events;
 
   // Prepare for simulation. Typically we use a time step of 1/60 of a
@@ -122,75 +125,79 @@ int main() {
   camera.projection = CAMERA_PERSPECTIVE;
 
   while (!WindowShouldClose()) {
-
-    if (IsKeyDown(KEY_LEFT)) {
-      shipLateralForce.x = -1500.0f;
-    } else if (IsKeyDown(KEY_RIGHT)) {
-      shipLateralForce.x = 1500.0f;
-    } else {
-      shipLateralForce.x = 0.0f;
-    }
-
-    if (IsKeyDown(KEY_UP)) {
-      shipEngineForce.z = -2000.0f;
-    } else if (IsKeyDown(KEY_DOWN)) {
-      shipEngineForce.z = 200.0f;
-    }
-
-    if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
-      shipEngineForce.z = 0.0f;
-    }
-
-    if (IsKeyPressed(KEY_SPACE)) {
-      b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
-    }
-
-    b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
-    b3Body_ApplyForceToCenter(shipBodyId, shipLateralForce, true);
-
     b3World_Step(worldId, timeStep, subStepCount);
-    events = b3World_GetContactEvents(worldId);
     shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
-    for(int i = 0; i < events.hitCount; i++) {
-      b3ContactHitEvent *hit = &events.hitEvents[i];
-      if(hit->normal.z == 1.0f) {
-        printf("FRONTAL COLLISION\n");
-        // TODO: The ship had a frontal collision with a static object.
-        //       Destroy the ship and restart the level.
+    if (!shipIsExploding) {
+      if (IsKeyDown(KEY_LEFT)) {
+        shipLateralForce.x = -1500.0f;
+      } else if (IsKeyDown(KEY_RIGHT)) {
+        shipLateralForce.x = 1500.0f;
+      } else {
+        shipLateralForce.x = 0.0f;
       }
-    }
 
-    for(int i = 0; i < events.beginCount; i++) {
-      b3ContactBeginTouchEvent *event = &events.beginEvents[i];
-      if (b3Contact_IsValid(event->contactId)) {
-        b3ContactData data = b3Contact_GetData(event->contactId);
-        for(int j = 0; j < data.manifoldCount; j++) {
-          if(data.manifolds[j].normal.y == 1.0f) {
-            printf("SHIP IS ON THE GROUND\n");
-            shipOnGround = true;
+      if (IsKeyDown(KEY_UP)) {
+        shipEngineForce.z = -2000.0f;
+      } else if (IsKeyDown(KEY_DOWN)) {
+        shipEngineForce.z = 200.0f;
+      }
+
+      if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
+        shipEngineForce.z = 0.0f;
+      }
+
+      if (IsKeyPressed(KEY_SPACE)) {
+        b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
+      }
+
+      b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
+      b3Body_ApplyForceToCenter(shipBodyId, shipLateralForce, true);
+
+      events = b3World_GetContactEvents(worldId);
+
+      for(int i = 0; i < events.hitCount && !shipIsExploding; i++) {
+        b3ContactHitEvent *hit = &events.hitEvents[i];
+        if(hit->normal.z == 1.0f) {
+          printf("FRONTAL COLLISION\n");
+          shipIsExploding = true;
+          float explosionMagnitude = 0.0000001f + ((-prevShipSpeed.z * 0.0003f) / 100.0f);
+          createExplosionSpheres(worldId, explosionSpheres, (Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize, 0.05f, 0.1f, explosionMagnitude);
+        }
+      }
+
+      for(int i = 0; i < events.beginCount; i++) {
+        b3ContactBeginTouchEvent *event = &events.beginEvents[i];
+        if (b3Contact_IsValid(event->contactId)) {
+          b3ContactData data = b3Contact_GetData(event->contactId);
+          for(int j = 0; j < data.manifoldCount; j++) {
+            if(data.manifolds[j].normal.y == 1.0f) {
+              printf("SHIP IS ON THE GROUND\n");
+              shipOnGround = true;
+            }
           }
         }
       }
-    }
 
-    for(int i = 0; i < events.endCount; i++) {
-      b3ContactEndTouchEvent *event = &events.endEvents[i];
-      if (b3Shape_IsValid(event->shapeIdA) && b3Shape_IsValid(event->shapeIdB)) {
-        b3AABB aabbA = b3Shape_GetAABB(event->shapeIdA);
-        b3AABB aabbB = b3Shape_GetAABB(event->shapeIdB);
+      for(int i = 0; i < events.endCount; i++) {
+        b3ContactEndTouchEvent *event = &events.endEvents[i];
+        if (b3Shape_IsValid(event->shapeIdA) && b3Shape_IsValid(event->shapeIdB)) {
+          b3AABB aabbA = b3Shape_GetAABB(event->shapeIdA);
+          b3AABB aabbB = b3Shape_GetAABB(event->shapeIdB);
 
-        if((aabbA.upperBound.y < aabbB.lowerBound.y) ||
-           ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.z > aabbB.upperBound.z)) ||
-           ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.x > aabbB.upperBound.x)) ||
-           ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.upperBound.x < aabbB.lowerBound.x))) {
-            printf("SHIP IS NOT ON THE GROUND\n");
-          shipOnGround = false;
+          if((aabbA.upperBound.y < aabbB.lowerBound.y) ||
+            ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.z > aabbB.upperBound.z)) ||
+            ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.x > aabbB.upperBound.x)) ||
+            ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.upperBound.x < aabbB.lowerBound.x))) {
+              printf("SHIP IS NOT ON THE GROUND\n");
+            shipOnGround = false;
+          }
         }
       }
-    }
 
-    shipPosition = b3Body_GetPosition(shipBodyId);
+      shipPosition = b3Body_GetPosition(shipBodyId);
+    }
+    prevShipSpeed = shipSpeed;
 
     BeginTextureMode(target);
     ClearBackground(BLACK);
@@ -198,14 +205,16 @@ int main() {
 
     BeginMode3D(camera);
 
-    DrawModelEx(
-      shipModel,
-      (Vector3){shipPosition.x, shipPosition.y - 0.25f, shipPosition.z},
-      (Vector3){0.0f, 0.0f, 0.0f},
-      0.0f,
-      (Vector3){0.3f, 0.3f, 0.3f},
-      WHITE
-    );
+    if (!shipIsExploding) {
+      DrawModelEx(
+        shipModel,
+        (Vector3){shipPosition.x, shipPosition.y - 0.25f, shipPosition.z},
+        (Vector3){0.0f, 0.0f, 0.0f},
+        0.0f,
+        (Vector3){0.3f, 0.3f, 0.3f},
+        WHITE
+      );
+    }
 
     //DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
     if (DEBUG) {
@@ -227,6 +236,24 @@ int main() {
           DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
           drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
         }
+      }
+    }
+
+    if (shipIsExploding) {
+      for (int i = 0; i < EXPLOSION_SPHERES_COUNT; i++) {
+        if (explosionSpheres[i].alpha == 0.0f) {
+          continue;
+        }
+
+        if (explosionSpheres[i].alpha > 1) {
+          explosionSpheres[i].alpha -= 1.0f;
+          b3Pos pos = b3Body_GetPosition(explosionSpheres[i].box3DBodyId);
+          explosionSpheres[i].color.a = explosionSpheres[i].alpha;
+          DrawSphere((Vector3){pos.x, pos.y, pos.z}, explosionSpheres[i].radius, explosionSpheres[i].color);
+        } else {
+          explosionSpheres[i].alpha = 0.0f;
+        }
+
       }
     }
 
