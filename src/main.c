@@ -1,18 +1,18 @@
 #include <assert.h>
 #include <stdio.h>
-//#include <stdlib.h>
 #include "common.h"
 #include "level.h"
 #include "lane.h"
 #include "tunnel.h"
 #include "explosion.h"
 
-int totalSegments;
-int currentSegmentIdx;
+int totalSegments = 0;
+int currentSegmentIdx = 0;
 srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL] = {0};
 srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
 bool shipIsExploding = false;
 bool shipOnGround = false;
+int currentLevel = 0;
 
 void initSegment(int segmentIdx, b3WorldId worldId) {
   for (int j = 0; j < segments[segmentIdx].totalRoadObjects; j++) {
@@ -80,16 +80,48 @@ b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize) {
   return shipBodyId;
 }
 
+void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg, Rectangle *bgSize, b3Vec3 *shipEngineForce, b3Vec3 *shipLateralForce) {
+  assert(level > 0 && "Cannot play a level with invalid id.");
+
+  if ((currentLevel != level) && (bg->id != 0)) {
+    UnloadTexture(*bg);
+  }
+
+  char filename[64];
+  snprintf(filename, sizeof(filename), "images/level%d.png", level);
+  *bg = LoadTexture(filename);
+  *bgSize = (Rectangle){0, 0, (float)bg->width, (float)bg->height};
+  currentLevel = level;
+  Vector3 shipPos = INITIAL_SHIP_POSITION;
+  *shipEngineForce = (b3Vec3){0.0f, 0.0f, 0.0f},
+  *shipLateralForce = (b3Vec3){0.0f, 0.0f, 0.0f};
+
+  b3Body_SetTransform(shipBodyId, (b3Pos){shipPos.x, shipPos.y, shipPos.z}, b3Body_GetRotation(shipBodyId));
+
+  if(shipIsExploding) {
+    destroyExplosionSpheres(explosionSpheres);
+  }
+
+  loadLevel(level);
+  for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
+    initSegment(s, worldId);
+  }
+
+  shipIsExploding = false;
+}
+
 int main() {
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(60);
 
+  currentLevel = 0;
+
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
-  Texture2D background = LoadTexture("images/level1.png");
-  Rectangle bgSize = {0, 0, (float)background.width, (float)background.height};
+  Texture2D bg = (Texture2D){0};
+  Rectangle bgSize = (Rectangle){0};
   Texture2D hudPanel = LoadTexture("images/hud_panel.png");
 
   b3WorldDef worldDef = b3DefaultWorldDef();
@@ -97,7 +129,7 @@ int main() {
   worldDef.restitutionThreshold = 0.1f;
   b3WorldId worldId = b3CreateWorld(&worldDef);
 
-  Vector3 shipPos = (Vector3){5.5f, 1.5f, 10.0f};
+  Vector3 shipPos = INITIAL_SHIP_POSITION;
   Vector3 shipSize = (Vector3){1.33f, 0.5f, 0.7f};
   b3BodyId shipBodyId = createShipBody(worldId, shipPos, shipSize);
   b3Pos shipPosition;
@@ -113,17 +145,14 @@ int main() {
   float timeStep = 1.0f / 60.0f;
   int subStepCount = 4;
 
-  loadLevel(1);
-  for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
-    initSegment(s, worldId);
-  }
-
   Camera3D camera = {0};
   camera.position = (Vector3){5.5f, 7.5f, shipPos.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA};
   camera.target = (Vector3){5.5f, 2.5f, camera.position.z - CAMERA_TARGET_Z_DISTANCE};
   camera.up = (Vector3){0.0f, 1.0f, 0.0f};
   camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
+
+  playLevel(1, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
 
   while (!WindowShouldClose()) {
     b3World_Step(worldId, timeStep, subStepCount);
@@ -202,7 +231,7 @@ int main() {
 
     BeginTextureMode(target);
     ClearBackground(BLACK);
-    DrawTexturePro(background, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
+    DrawTexturePro(bg, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
 
     BeginMode3D(camera);
 
@@ -253,6 +282,8 @@ int main() {
           DrawSphere((Vector3){pos.x, pos.y, pos.z}, explosionSpheres[i].radius, explosionSpheres[i].color);
         } else {
           explosionSpheres[i].alpha = 0.0f;
+          playLevel(1, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce); // Restart level
+          break;
         }
 
       }
@@ -281,7 +312,7 @@ int main() {
   }
 
   UnloadModel(shipModel);
-  UnloadTexture(background);
+  UnloadTexture(bg);
   CloseWindow();
   b3DestroyWorld(worldId);
   return 0;

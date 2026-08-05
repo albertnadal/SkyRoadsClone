@@ -5,10 +5,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-int totalSegments = 0;
-int currentSegmentIdx = 0;
-srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL];
-
 static Color getColorFromId(int colorId) {
   switch (colorId) {
     case 0:  return BLACK;
@@ -26,7 +22,24 @@ static Color getColorFromId(int colorId) {
   }
 }
 
+void unloadCurrentLevel() {
+  for (int segmentIdx = 0; segmentIdx < totalSegments; segmentIdx++) {
+    srRoadSegment *currentRoadSegment = &segments[segmentIdx];
+    for (int roadObjectIdx = 0; roadObjectIdx < currentRoadSegment->totalRoadObjects; roadObjectIdx++) {
+      srRoadObject *roadObject = &currentRoadSegment->roadObjects[roadObjectIdx];
+      if (b3Body_IsValid(roadObject->box3DBodyId)) {
+        b3DestroyBody(roadObject->box3DBodyId);
+      }
+    }
+    currentRoadSegment->totalRoadObjects = 0;
+  }
+
+  totalSegments = 0;
+}
+
 void loadLevel(int level) {
+  unloadCurrentLevel();
+
   char filename[64];
   snprintf(filename, sizeof(filename), "levels/level%d.dat", level);
 

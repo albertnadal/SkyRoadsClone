@@ -14,6 +14,7 @@
 #define GRAVITY 3 * -9.80665f
 #define TUNNEL_SLICES 9
 #define EXPLOSION_SPHERES_COUNT 50
+#define INITIAL_SHIP_POSITION (Vector3){5.5f, 1.5f, 10.0f}
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
