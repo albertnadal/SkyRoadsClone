@@ -95,6 +95,8 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
   Vector3 shipPos = INITIAL_SHIP_POSITION;
   *shipEngineForce = (b3Vec3){0.0f, 0.0f, 0.0f},
   *shipLateralForce = (b3Vec3){0.0f, 0.0f, 0.0f};
+  b3Body_SetLinearVelocity(shipBodyId, (b3Vec3){0.0f, 0.0f, 0.0f});
+  b3Body_SetAngularVelocity(shipBodyId, (b3Vec3){0.0f, 0.0f, 0.0f});
 
   b3Body_SetTransform(shipBodyId, (b3Pos){shipPos.x, shipPos.y, shipPos.z}, b3Body_GetRotation(shipBodyId));
 
@@ -226,6 +228,9 @@ int main() {
       }
 
       shipPosition = b3Body_GetPosition(shipBodyId);
+      if (shipPosition.y < SHIP_FALL_LIMIT_Y) {
+        playLevel(1, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce); // Restart level
+      }
     }
     prevShipSpeed = shipSpeed;
 

@@ -15,6 +15,7 @@
 #define TUNNEL_SLICES 9
 #define EXPLOSION_SPHERES_COUNT 50
 #define INITIAL_SHIP_POSITION (Vector3){5.5f, 1.5f, 10.0f}
+#define SHIP_FALL_LIMIT_Y -60.0f
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
