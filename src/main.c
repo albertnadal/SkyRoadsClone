@@ -118,9 +118,14 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
 int main() {
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
+  InitAudioDevice();
   SetTargetFPS(60);
 
   srGameScreenType currentGameScreen = SR_SCREEN_LEVEL_MENU;
+  Music menuMusic = LoadMusicStream("music/menu.mp3");
+  Music gameplayMusic = LoadMusicStream("music/gameplay.mp3");
+  menuMusic.looping = true;
+  gameplayMusic.looping = true;
 
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
@@ -162,13 +167,15 @@ int main() {
   camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
+  //playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
+  PlayMusicStream(menuMusic);
 
   while (!WindowShouldClose()) {
     b3World_Step(worldId, timeStep, subStepCount);
     shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
     if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
+      UpdateMusicStream(gameplayMusic);
       if (!shipIsExploding) {
         if (IsKeyDown(KEY_LEFT)) {
           shipLateralForce.x = -1500.0f;
@@ -338,6 +345,7 @@ int main() {
       EndTextureMode();
 
     } else if (currentGameScreen == SR_SCREEN_LEVEL_MENU) {
+      UpdateMusicStream(menuMusic);
       BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTexture(levelMenuBg, 0, 0, WHITE);
@@ -355,6 +363,8 @@ int main() {
       }
 
       if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+        StopMusicStream(menuMusic);
+        PlayMusicStream(gameplayMusic);
         currentGameScreen = SR_SCREEN_GAME_PLAY;
         playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
       }
@@ -381,6 +391,9 @@ int main() {
   UnloadTexture(hudPanel);
   UnloadTexture(levelMenuBg);
   UnloadFont(digitalFont);
+  UnloadMusicStream(menuMusic);
+  UnloadMusicStream(gameplayMusic);
+  CloseAudioDevice();
   CloseWindow();
   b3DestroyWorld(worldId);
   return 0;
