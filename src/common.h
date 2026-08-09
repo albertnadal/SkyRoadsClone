@@ -16,6 +16,9 @@
 #define EXPLOSION_SPHERES_COUNT 50
 #define INITIAL_SHIP_POSITION (Vector3){5.5f, 1.5f, 10.0f}
 #define SHIP_FALL_LIMIT_Y -60.0f
+#define SPEED_TEXT_BUFFER_SIZE 12
+#define SPEED_TEXT_FONT_SIZE 69.0f
+#define SPEED_TEXT_FONT_SPACING 5.0f
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

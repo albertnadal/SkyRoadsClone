@@ -125,6 +125,9 @@ int main() {
   Texture2D bg = (Texture2D){0};
   Rectangle bgSize = (Rectangle){0};
   Texture2D hudPanel = LoadTexture("images/hud_panel.png");
+  Font digitalFont = LoadFont("fonts/digital.ttf");
+  char speedText[SPEED_TEXT_BUFFER_SIZE];
+  Color speedTextFontColor = (Color){83, 244, 65, 255};
 
   b3WorldDef worldDef = b3DefaultWorldDef();
   worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
@@ -233,6 +236,7 @@ int main() {
       }
     }
     prevShipSpeed = shipSpeed;
+    snprintf(speedText, sizeof(speedText), "%.0f", fabsf(shipSpeed.z));
 
     BeginTextureMode(target);
     ClearBackground(BLACK);
@@ -300,6 +304,25 @@ int main() {
     int hudX = (SCR_WIDTH - hudPanel.width) / 2;
     int hudY = SCR_HEIGHT - hudPanel.height - 20;
     DrawTexture(hudPanel, hudX, hudY, WHITE);
+
+    Vector2 textSize = MeasureTextEx(
+      digitalFont,
+      speedText,
+      SPEED_TEXT_FONT_SIZE,
+      SPEED_TEXT_FONT_SPACING
+    );
+
+    DrawTextEx(
+      digitalFont,
+      speedText,
+      (Vector2){
+        hudX + (hudPanel.width / 2) - textSize.x - 50.0f,
+        hudY + (hudPanel.height / 4) - 1
+      },
+      SPEED_TEXT_FONT_SIZE,
+      SPEED_TEXT_FONT_SPACING,
+      speedTextFontColor
+    );
     EndTextureMode();
 
     BeginDrawing();
@@ -318,6 +341,7 @@ int main() {
 
   UnloadModel(shipModel);
   UnloadTexture(bg);
+  UnloadFont(digitalFont);
   CloseWindow();
   b3DestroyWorld(worldId);
   return 0;
