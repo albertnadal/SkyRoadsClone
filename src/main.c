@@ -13,7 +13,9 @@ srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
 bool shipIsExploding = false;
 bool shipOnGround = false;
 int availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
-int currentLevel = 0;
+int loadedLevel = 0;
+int selectedLevel = 0;
+srGameScreenType currentGameScreen;
 
 void initSegment(int segmentIdx, b3WorldId worldId) {
   for (int j = 0; j < segments[segmentIdx].totalRoadObjects; j++) {
@@ -82,9 +84,9 @@ b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize) {
 }
 
 void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg, Rectangle *bgSize, b3Vec3 *shipEngineForce, b3Vec3 *shipLateralForce) {
-  assert(level > 0 && "Cannot play a level with invalid id.");
+  assert(level >= 0 && "Cannot play a level with invalid id.");
 
-  if ((currentLevel != level) && (bg->id != 0)) {
+  if ((loadedLevel != level) && (bg->id != 0)) {
     UnloadTexture(*bg);
   }
 
@@ -92,7 +94,7 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
   snprintf(filename, sizeof(filename), "images/level%d.png", level);
   *bg = LoadTexture(filename);
   *bgSize = (Rectangle){0, 0, (float)bg->width, (float)bg->height};
-  currentLevel = level;
+  loadedLevel = level;
   Vector3 shipPos = INITIAL_SHIP_POSITION;
   *shipEngineForce = (b3Vec3){0.0f, 0.0f, 0.0f},
   *shipLateralForce = (b3Vec3){0.0f, 0.0f, 0.0f};
@@ -118,17 +120,19 @@ int main() {
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
   SetTargetFPS(60);
 
-  currentLevel = 0;
+  srGameScreenType currentGameScreen = SR_SCREEN_LEVEL_MENU;
 
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
+  Texture2D levelMenuBg = LoadTexture("images/level_menu.png");
   Texture2D bg = (Texture2D){0};
   Rectangle bgSize = (Rectangle){0};
   Texture2D hudPanel = LoadTexture("images/hud_panel.png");
   Font digitalFont = LoadFont("fonts/digital.ttf");
   char speedText[SPEED_TEXT_BUFFER_SIZE];
   Color speedTextFontColor = (Color){83, 244, 65, 255};
+  Color levelSelectorColor = (Color){83, 244, 65, 255};
 
   b3WorldDef worldDef = b3DefaultWorldDef();
   worldDef.gravity = (b3Vec3){0.0f, GRAVITY, 0.0f};
@@ -158,175 +162,207 @@ int main() {
   camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  playLevel(1, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
+  playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
 
   while (!WindowShouldClose()) {
     b3World_Step(worldId, timeStep, subStepCount);
     shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
-    if (!shipIsExploding) {
-      if (IsKeyDown(KEY_LEFT)) {
-        shipLateralForce.x = -1500.0f;
-      } else if (IsKeyDown(KEY_RIGHT)) {
-        shipLateralForce.x = 1500.0f;
-      } else {
-        shipLateralForce.x = 0.0f;
-      }
-
-      if (IsKeyDown(KEY_UP)) {
-        shipEngineForce.z = -2000.0f;
-      } else if (IsKeyDown(KEY_DOWN)) {
-        shipEngineForce.z = 200.0f;
-      }
-
-      if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
-        shipEngineForce.z = 0.0f;
-      }
-
-      if (IsKeyPressed(KEY_SPACE) && (availableJumpsInTheAir > 0)) {
-        b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
-        availableJumpsInTheAir--;
-      }
-
-      b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
-      b3Body_ApplyForceToCenter(shipBodyId, shipLateralForce, true);
-
-      events = b3World_GetContactEvents(worldId);
-
-      for(int i = 0; i < events.hitCount && !shipIsExploding; i++) {
-        b3ContactHitEvent *hit = &events.hitEvents[i];
-        if(hit->normal.z == 1.0f) {
-          printf("FRONTAL COLLISION\n");
-          shipIsExploding = true;
-          float explosionMagnitude = 0.0000001f + ((-prevShipSpeed.z * 0.0003f) / 100.0f);
-          createExplosionSpheres(worldId, explosionSpheres, (Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize, 0.05f, 0.1f, explosionMagnitude);
+    if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
+      if (!shipIsExploding) {
+        if (IsKeyDown(KEY_LEFT)) {
+          shipLateralForce.x = -1500.0f;
+        } else if (IsKeyDown(KEY_RIGHT)) {
+          shipLateralForce.x = 1500.0f;
+        } else {
+          shipLateralForce.x = 0.0f;
         }
-      }
 
-      for(int i = 0; i < events.beginCount; i++) {
-        b3ContactBeginTouchEvent *event = &events.beginEvents[i];
-        if (b3Contact_IsValid(event->contactId)) {
-          b3ContactData data = b3Contact_GetData(event->contactId);
-          for(int j = 0; j < data.manifoldCount; j++) {
-            if(data.manifolds[j].normal.y == 1.0f) {
-              printf("SHIP IS ON THE GROUND\n");
-              shipOnGround = true;
-              availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
+        if (IsKeyDown(KEY_UP)) {
+          shipEngineForce.z = -2000.0f;
+        } else if (IsKeyDown(KEY_DOWN)) {
+          shipEngineForce.z = 200.0f;
+        }
+
+        if (IsKeyReleased(KEY_UP) || IsKeyReleased(KEY_DOWN)) {
+          shipEngineForce.z = 0.0f;
+        }
+
+        if (IsKeyPressed(KEY_SPACE) && (availableJumpsInTheAir > 0)) {
+          b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
+          availableJumpsInTheAir--;
+        }
+
+        b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
+        b3Body_ApplyForceToCenter(shipBodyId, shipLateralForce, true);
+
+        events = b3World_GetContactEvents(worldId);
+
+        for(int i = 0; i < events.hitCount && !shipIsExploding; i++) {
+          b3ContactHitEvent *hit = &events.hitEvents[i];
+          if(hit->normal.z == 1.0f) {
+            printf("FRONTAL COLLISION\n");
+            shipIsExploding = true;
+            float explosionMagnitude = 0.0000001f + ((-prevShipSpeed.z * 0.0003f) / 100.0f);
+            createExplosionSpheres(worldId, explosionSpheres, (Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize, 0.05f, 0.1f, explosionMagnitude);
+          }
+        }
+
+        for(int i = 0; i < events.beginCount; i++) {
+          b3ContactBeginTouchEvent *event = &events.beginEvents[i];
+          if (b3Contact_IsValid(event->contactId)) {
+            b3ContactData data = b3Contact_GetData(event->contactId);
+            for(int j = 0; j < data.manifoldCount; j++) {
+              if(data.manifolds[j].normal.y == 1.0f) {
+                printf("SHIP IS ON THE GROUND\n");
+                shipOnGround = true;
+                availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
+              }
             }
           }
         }
+
+        for(int i = 0; i < events.endCount; i++) {
+          b3ContactEndTouchEvent *event = &events.endEvents[i];
+          if (b3Shape_IsValid(event->shapeIdA) && b3Shape_IsValid(event->shapeIdB)) {
+            b3AABB aabbA = b3Shape_GetAABB(event->shapeIdA);
+            b3AABB aabbB = b3Shape_GetAABB(event->shapeIdB);
+
+            if((aabbA.upperBound.y < aabbB.lowerBound.y) ||
+              ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.z > aabbB.upperBound.z)) ||
+              ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.x > aabbB.upperBound.x)) ||
+              ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.upperBound.x < aabbB.lowerBound.x))) {
+                printf("SHIP IS NOT ON THE GROUND\n");
+              shipOnGround = false;
+            }
+          }
+        }
+
+        shipPosition = b3Body_GetPosition(shipBodyId);
+        if (shipPosition.y < SHIP_FALL_LIMIT_Y) {
+          playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce); // Restart level
+        }
+      }
+      prevShipSpeed = shipSpeed;
+      snprintf(speedText, sizeof(speedText), "%.0f", fabsf(shipSpeed.z));
+
+      BeginTextureMode(target);
+      ClearBackground(BLACK);
+      DrawTexturePro(bg, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
+
+      BeginMode3D(camera);
+
+      if (!shipIsExploding) {
+        DrawModelEx(
+          shipModel,
+          (Vector3){shipPosition.x, shipPosition.y - 0.25f, shipPosition.z},
+          (Vector3){0.0f, 0.0f, 0.0f},
+          0.0f,
+          (Vector3){0.3f, 0.3f, 0.3f},
+          WHITE
+        );
       }
 
-      for(int i = 0; i < events.endCount; i++) {
-        b3ContactEndTouchEvent *event = &events.endEvents[i];
-        if (b3Shape_IsValid(event->shapeIdA) && b3Shape_IsValid(event->shapeIdB)) {
-          b3AABB aabbA = b3Shape_GetAABB(event->shapeIdA);
-          b3AABB aabbB = b3Shape_GetAABB(event->shapeIdB);
+      //DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
+      if (DEBUG) {
+        DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
+      }
 
-          if((aabbA.upperBound.y < aabbB.lowerBound.y) ||
-            ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.z > aabbB.upperBound.z)) ||
-            ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.x > aabbB.upperBound.x)) ||
-            ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.upperBound.x < aabbB.lowerBound.x))) {
-              printf("SHIP IS NOT ON THE GROUND\n");
-            shipOnGround = false;
+      camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
+      camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
+
+      for (int i = currentSegmentIdx; i < MIN(currentSegmentIdx + MAX_VISIBLE_SEGMENTS, totalSegments); i++ ) {
+        for (int j = 0; j < segments[i].totalRoadObjects; j++) {
+          srRoadObject *obj = &segments[i].roadObjects[j];
+          b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
+
+          if(obj->type == SR_ROAD_OBJECT_LANE) {
+            DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
+            DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
+          } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
+            DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
+            drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
           }
         }
       }
 
-      shipPosition = b3Body_GetPosition(shipBodyId);
-      if (shipPosition.y < SHIP_FALL_LIMIT_Y) {
-        playLevel(1, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce); // Restart level
+      if (shipIsExploding) {
+        for (int i = 0; i < EXPLOSION_SPHERES_COUNT; i++) {
+          if (explosionSpheres[i].alpha == 0.0f) {
+            continue;
+          }
+
+          if (explosionSpheres[i].alpha > 1) {
+            explosionSpheres[i].alpha -= 1.0f;
+            b3Pos pos = b3Body_GetPosition(explosionSpheres[i].box3DBodyId);
+            explosionSpheres[i].color.a = explosionSpheres[i].alpha;
+            DrawSphere((Vector3){pos.x, pos.y, pos.z}, explosionSpheres[i].radius, explosionSpheres[i].color);
+          } else {
+            explosionSpheres[i].alpha = 0.0f;
+            playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce); // Restart level
+            break;
+          }
+        }
       }
-    }
-    prevShipSpeed = shipSpeed;
-    snprintf(speedText, sizeof(speedText), "%.0f", fabsf(shipSpeed.z));
 
-    BeginTextureMode(target);
-    ClearBackground(BLACK);
-    DrawTexturePro(bg, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
+      EndMode3D();
+      if (DEBUG) {
+        DrawFPS(16, 16);
+      }
 
-    BeginMode3D(camera);
+      int hudX = (SCR_WIDTH - hudPanel.width) / 2;
+      int hudY = SCR_HEIGHT - hudPanel.height - 20;
+      DrawTexture(hudPanel, hudX, hudY, WHITE);
 
-    if (!shipIsExploding) {
-      DrawModelEx(
-        shipModel,
-        (Vector3){shipPosition.x, shipPosition.y - 0.25f, shipPosition.z},
-        (Vector3){0.0f, 0.0f, 0.0f},
-        0.0f,
-        (Vector3){0.3f, 0.3f, 0.3f},
-        WHITE
+      Vector2 textSize = MeasureTextEx(
+        digitalFont,
+        speedText,
+        SPEED_TEXT_FONT_SIZE,
+        SPEED_TEXT_FONT_SPACING
       );
-    }
 
-    //DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
-    if (DEBUG) {
-      DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
-    }
+      DrawTextEx(
+        digitalFont,
+        speedText,
+        (Vector2){
+          hudX + (hudPanel.width / 2) - textSize.x - 50.0f,
+          hudY + (hudPanel.height / 4) - 1
+        },
+        SPEED_TEXT_FONT_SIZE,
+        SPEED_TEXT_FONT_SPACING,
+        speedTextFontColor
+      );
 
-    camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
-    camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
+      // IF Z position of the Ship is higher than the Z position of the last lane of the current segment then 
+      // call the function initNextVisibleSegment(worldId) to load the bodies of the next visible segment.
+      EndTextureMode();
 
-    for (int i = currentSegmentIdx; i < MIN(currentSegmentIdx + MAX_VISIBLE_SEGMENTS, totalSegments); i++ ) {
-      for (int j = 0; j < segments[i].totalRoadObjects; j++) {
-        srRoadObject *obj = &segments[i].roadObjects[j];
-        b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
+    } else if (currentGameScreen == SR_SCREEN_LEVEL_MENU) {
+      BeginTextureMode(target);
+      ClearBackground(BLACK);
+      DrawTexture(levelMenuBg, 0, 0, WHITE);
 
-        if(obj->type == SR_ROAD_OBJECT_LANE) {
-          DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
-          DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
-        } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
-          DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
-          drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
-        }
+      if (IsKeyPressed(KEY_LEFT)) {
+        selectedLevel = ((selectedLevel - (TOTAL_LEVELS / 2)) + TOTAL_LEVELS) % TOTAL_LEVELS;
+      } else if (IsKeyPressed(KEY_RIGHT)) {
+        selectedLevel = ((TOTAL_LEVELS / 2) + selectedLevel) % TOTAL_LEVELS;
       }
-    }
 
-    if (shipIsExploding) {
-      for (int i = 0; i < EXPLOSION_SPHERES_COUNT; i++) {
-        if (explosionSpheres[i].alpha == 0.0f) {
-          continue;
-        }
-
-        if (explosionSpheres[i].alpha > 1) {
-          explosionSpheres[i].alpha -= 1.0f;
-          b3Pos pos = b3Body_GetPosition(explosionSpheres[i].box3DBodyId);
-          explosionSpheres[i].color.a = explosionSpheres[i].alpha;
-          DrawSphere((Vector3){pos.x, pos.y, pos.z}, explosionSpheres[i].radius, explosionSpheres[i].color);
-        } else {
-          explosionSpheres[i].alpha = 0.0f;
-          playLevel(1, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce); // Restart level
-          break;
-        }
-
+      if (IsKeyPressed(KEY_UP)) {
+        selectedLevel = (selectedLevel - 1 + TOTAL_LEVELS) % TOTAL_LEVELS;
+      } else if (IsKeyPressed(KEY_DOWN)) {
+        selectedLevel = (selectedLevel + 1) % TOTAL_LEVELS;
       }
+
+      if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+        currentGameScreen = SR_SCREEN_GAME_PLAY;
+        playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
+      }
+
+      Rectangle levelSelectorRect = (Rectangle){192 + ((selectedLevel < (TOTAL_LEVELS / 2)) ? 0 : 661), 52 + (selectedLevel % (TOTAL_LEVELS / 2) * 196), 225, 141};
+      DrawRectangleLinesEx(levelSelectorRect, 5.0f, levelSelectorColor);
+      EndTextureMode();
     }
-
-    EndMode3D();
-    DrawFPS(16, 16);
-
-    int hudX = (SCR_WIDTH - hudPanel.width) / 2;
-    int hudY = SCR_HEIGHT - hudPanel.height - 20;
-    DrawTexture(hudPanel, hudX, hudY, WHITE);
-
-    Vector2 textSize = MeasureTextEx(
-      digitalFont,
-      speedText,
-      SPEED_TEXT_FONT_SIZE,
-      SPEED_TEXT_FONT_SPACING
-    );
-
-    DrawTextEx(
-      digitalFont,
-      speedText,
-      (Vector2){
-        hudX + (hudPanel.width / 2) - textSize.x - 50.0f,
-        hudY + (hudPanel.height / 4) - 1
-      },
-      SPEED_TEXT_FONT_SIZE,
-      SPEED_TEXT_FONT_SPACING,
-      speedTextFontColor
-    );
-    EndTextureMode();
 
     BeginDrawing();
     DrawTexturePro(
@@ -338,12 +374,12 @@ int main() {
         WHITE
     );
     EndDrawing();
-    // IF Z position of the Ship is higher than the Z position of the last lane of the current segment then 
-    // call the function initNextVisibleSegment(worldId) to load the bodies of the next visible segment.
   }
 
   UnloadModel(shipModel);
   UnloadTexture(bg);
+  UnloadTexture(hudPanel);
+  UnloadTexture(levelMenuBg);
   UnloadFont(digitalFont);
   CloseWindow();
   b3DestroyWorld(worldId);

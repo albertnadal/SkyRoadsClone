@@ -19,7 +19,8 @@
 #define SPEED_TEXT_BUFFER_SIZE 12
 #define SPEED_TEXT_FONT_SIZE 69.0f
 #define SPEED_TEXT_FONT_SPACING 5.0f
-#define DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR 2;
+#define DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR 2
+#define TOTAL_LEVELS 8
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
@@ -30,6 +31,12 @@ static const float SCR_HEIGHT = 800.0f;
 static const float RES_WIDTH  = 1280.0f; //320
 static const float RES_HEIGHT = 800.0f; //200
 static const char WINDOW_TITLE[] = "SkyRoads Clone";
+
+typedef enum {
+  SR_SCREEN_MAIN_MENU = 0,
+  SR_SCREEN_LEVEL_MENU = 1,
+  SR_SCREEN_GAME_PLAY = 2
+} srGameScreenType;
 
 typedef enum {
   SR_ROAD_OBJECT_NONE = 0,
