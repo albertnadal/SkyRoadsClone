@@ -19,6 +19,7 @@
 #define SPEED_TEXT_BUFFER_SIZE 12
 #define SPEED_TEXT_FONT_SIZE 69.0f
 #define SPEED_TEXT_FONT_SPACING 5.0f
+#define DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR 2;
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))

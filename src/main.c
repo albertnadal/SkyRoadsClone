@@ -12,6 +12,7 @@ srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL] = {0};
 srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
 bool shipIsExploding = false;
 bool shipOnGround = false;
+int availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
 int currentLevel = 0;
 
 void initSegment(int segmentIdx, b3WorldId worldId) {
@@ -182,8 +183,9 @@ int main() {
         shipEngineForce.z = 0.0f;
       }
 
-      if (IsKeyPressed(KEY_SPACE)) {
+      if (IsKeyPressed(KEY_SPACE) && (availableJumpsInTheAir > 0)) {
         b3Body_ApplyForceToCenter(shipBodyId, (b3Pos){0.0f, 90000.0f, 0.0f}, true);
+        availableJumpsInTheAir--;
       }
 
       b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
@@ -209,6 +211,7 @@ int main() {
             if(data.manifolds[j].normal.y == 1.0f) {
               printf("SHIP IS ON THE GROUND\n");
               shipOnGround = true;
+              availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
             }
           }
         }
