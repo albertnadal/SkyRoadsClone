@@ -52,7 +52,6 @@ typedef struct {
   srRoadObjectType type;
   b3BodyId box3DBodyId;
   Model model;
-  bool isLast;
 } srRoadObject;
 
 typedef struct {

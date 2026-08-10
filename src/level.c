@@ -90,7 +90,6 @@ void loadLevel(int level, b3WorldId worldId, srRoadObject objects[], int* totalO
     obj->color = getColorFromId(colorValue);
     obj->type = (srRoadObjectType)type;
     obj->model = (Model){0};
-    obj->isLast = false;
     memset(&obj->box3DBodyId, 0, sizeof(obj->box3DBodyId));
     (*totalObjects)++;
   }
