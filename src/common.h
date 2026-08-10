@@ -19,6 +19,9 @@
 #define SPEED_TEXT_BUFFER_SIZE 12
 #define SPEED_TEXT_FONT_SIZE 69.0f
 #define SPEED_TEXT_FONT_SPACING 5.0f
+#define PRESS_SPACE_TEXT_BUFFER_SIZE 32
+#define PRESS_SPACE_TEXT_FONT_SIZE 26.0f
+#define PRESS_SPACE_TEXT_FONT_SPACING -1.0f
 #define DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR 2
 #define TOTAL_LEVELS 8
 
@@ -30,7 +33,7 @@ static const float SCR_WIDTH  = 1280.0f;
 static const float SCR_HEIGHT = 800.0f;
 static const float RES_WIDTH  = 1280.0f; //320
 static const float RES_HEIGHT = 800.0f; //200
-static const char WINDOW_TITLE[] = "SkyRoads Clone";
+static const char WINDOW_TITLE[] = "VectorRoads";
 
 typedef enum {
   SR_SCREEN_MAIN_MENU = 0,

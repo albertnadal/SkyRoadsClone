@@ -121,7 +121,7 @@ int main() {
   InitAudioDevice();
   SetTargetFPS(60);
 
-  srGameScreenType currentGameScreen = SR_SCREEN_LEVEL_MENU;
+  srGameScreenType currentGameScreen = SR_SCREEN_MAIN_MENU;
   Music menuMusic = LoadMusicStream("music/menu.mp3");
   Music gameplayMusic = LoadMusicStream("music/gameplay.mp3");
   menuMusic.looping = true;
@@ -130,13 +130,16 @@ int main() {
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
+  Texture2D mainMenuBg = LoadTexture("images/main_menu.png");
   Texture2D levelMenuBg = LoadTexture("images/level_menu.png");
   Texture2D bg = (Texture2D){0};
   Rectangle bgSize = (Rectangle){0};
   Texture2D hudPanel = LoadTexture("images/hud_panel.png");
   Font digitalFont = LoadFont("fonts/digital.ttf");
+  Font retroFont = LoadFont("fonts/retro.ttf");
   char speedText[SPEED_TEXT_BUFFER_SIZE];
-  Color speedTextFontColor = (Color){83, 244, 65, 255};
+  char pressSpaceText[PRESS_SPACE_TEXT_BUFFER_SIZE] = "Press SPACE to continue...";
+  Color textFontColor = (Color){83, 244, 65, 255};
   Color levelSelectorColor = (Color){83, 244, 65, 255};
 
   b3WorldDef worldDef = b3DefaultWorldDef();
@@ -174,7 +177,39 @@ int main() {
     b3World_Step(worldId, timeStep, subStepCount);
     shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
-    if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
+    if (currentGameScreen == SR_SCREEN_MAIN_MENU) {
+      UpdateMusicStream(menuMusic);
+      BeginTextureMode(target);
+      ClearBackground(BLACK);
+      DrawTexture(mainMenuBg, 0, 0, WHITE);
+
+      if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+        currentGameScreen = SR_SCREEN_LEVEL_MENU;
+      }
+
+      if (((int)(GetTime() * 2.0)) % 2 == 0) {
+        Vector2 textSize = MeasureTextEx(
+          retroFont,
+          pressSpaceText,
+          PRESS_SPACE_TEXT_FONT_SIZE,
+          PRESS_SPACE_TEXT_FONT_SPACING
+        );
+
+        DrawTextEx(
+          retroFont,
+          pressSpaceText,
+          (Vector2){
+            (SCR_WIDTH - textSize.x) / 2,
+            SCR_HEIGHT - (SCR_HEIGHT / 3)
+          },
+          PRESS_SPACE_TEXT_FONT_SIZE,
+          PRESS_SPACE_TEXT_FONT_SPACING,
+          textFontColor
+        );
+      }
+
+      EndTextureMode();
+    } else if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
       UpdateMusicStream(gameplayMusic);
       if (!shipIsExploding) {
         if (IsKeyDown(KEY_LEFT)) {
@@ -337,7 +372,7 @@ int main() {
         },
         SPEED_TEXT_FONT_SIZE,
         SPEED_TEXT_FONT_SPACING,
-        speedTextFontColor
+        textFontColor
       );
 
       // IF Z position of the Ship is higher than the Z position of the last lane of the current segment then 
@@ -390,7 +425,9 @@ int main() {
   UnloadTexture(bg);
   UnloadTexture(hudPanel);
   UnloadTexture(levelMenuBg);
+  UnloadTexture(mainMenuBg);
   UnloadFont(digitalFont);
+  UnloadFont(retroFont);
   UnloadMusicStream(menuMusic);
   UnloadMusicStream(gameplayMusic);
   CloseAudioDevice();
