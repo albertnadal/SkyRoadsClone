@@ -12,6 +12,7 @@ srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL] = {0};
 srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
 bool shipIsExploding = false;
 bool shipOnGround = false;
+bool quitGame = false;
 int availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
 int loadedLevel = 0;
 int selectedLevel = 0;
@@ -116,10 +117,14 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
 }
 
 int main() {
+  if (!DEBUG) {
+    SetTraceLogLevel(LOG_NONE);
+  }
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
-  InitAudioDevice();
+  SetExitKey(KEY_NULL);
   SetTargetFPS(60);
+  InitAudioDevice();
 
   srGameScreenType currentGameScreen = SR_SCREEN_MAIN_MENU;
   Music menuMusic = LoadMusicStream("music/menu.mp3");
@@ -170,18 +175,23 @@ int main() {
   camera.fovy = 40.0f;
   camera.projection = CAMERA_PERSPECTIVE;
 
-  //playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
+  bool ignoreEscape = false;
   PlayMusicStream(menuMusic);
 
-  while (!WindowShouldClose()) {
-    b3World_Step(worldId, timeStep, subStepCount);
-    shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
+  while (!WindowShouldClose() && !quitGame) {
 
     if (currentGameScreen == SR_SCREEN_MAIN_MENU) {
       UpdateMusicStream(menuMusic);
       BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTexture(mainMenuBg, 0, 0, WHITE);
+
+      if (!ignoreEscape && IsKeyPressed(KEY_ESCAPE)) {
+        quitGame = true;
+        continue;
+      } else if (!IsKeyDown(KEY_ESCAPE)) {
+        ignoreEscape = false;
+      }
 
       if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
         currentGameScreen = SR_SCREEN_LEVEL_MENU;
@@ -211,6 +221,24 @@ int main() {
       EndTextureMode();
     } else if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
       UpdateMusicStream(gameplayMusic);
+
+      if (IsKeyPressed(KEY_ESCAPE)) {
+        if(shipIsExploding) {
+          destroyExplosionSpheres(explosionSpheres);
+        }
+        shipIsExploding = false;
+        unloadCurrentLevel();
+        StopMusicStream(gameplayMusic);
+        SeekMusicStream(menuMusic, 0.0);
+        PlayMusicStream(menuMusic);
+        ignoreEscape = true;
+        currentGameScreen = SR_SCREEN_LEVEL_MENU;
+        continue;
+      }
+
+      b3World_Step(worldId, timeStep, subStepCount);
+      shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
+
       if (!shipIsExploding) {
         if (IsKeyDown(KEY_LEFT)) {
           shipLateralForce.x = -1500.0f;
@@ -385,6 +413,14 @@ int main() {
       ClearBackground(BLACK);
       DrawTexture(levelMenuBg, 0, 0, WHITE);
 
+      if (!ignoreEscape && IsKeyPressed(KEY_ESCAPE)) {
+        ignoreEscape = true;
+        currentGameScreen = SR_SCREEN_MAIN_MENU;
+        continue;
+      } else if (!IsKeyDown(KEY_ESCAPE)) {
+        ignoreEscape = false;
+      }
+
       if (IsKeyPressed(KEY_LEFT)) {
         selectedLevel = ((selectedLevel - (TOTAL_LEVELS / 2)) + TOTAL_LEVELS) % TOTAL_LEVELS;
       } else if (IsKeyPressed(KEY_RIGHT)) {
@@ -399,6 +435,7 @@ int main() {
 
       if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
         StopMusicStream(menuMusic);
+        SeekMusicStream(gameplayMusic, 0.0);
         PlayMusicStream(gameplayMusic);
         currentGameScreen = SR_SCREEN_GAME_PLAY;
         playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
@@ -421,6 +458,7 @@ int main() {
     EndDrawing();
   }
 
+  b3DestroyWorld(worldId);
   UnloadModel(shipModel);
   UnloadTexture(bg);
   UnloadTexture(hudPanel);
@@ -432,6 +470,5 @@ int main() {
   UnloadMusicStream(gameplayMusic);
   CloseAudioDevice();
   CloseWindow();
-  b3DestroyWorld(worldId);
   return 0;
 }
