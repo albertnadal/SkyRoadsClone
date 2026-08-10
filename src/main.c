@@ -6,9 +6,8 @@
 #include "tunnel.h"
 #include "explosion.h"
 
-int totalSegments = 0;
-int currentSegmentIdx = 0;
-srRoadSegment segments[MAX_SEGMENTS_PER_LEVEL] = {0};
+int totalRoadObjects;
+srRoadObject roadObjects[MAX_ROAD_OBJECTS_PER_LEVEL] = {0};
 srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
 bool shipIsExploding = false;
 bool shipOnGround = false;
@@ -17,26 +16,6 @@ int availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
 int loadedLevel = 0;
 int selectedLevel = 0;
 srGameScreenType currentGameScreen;
-
-void initSegment(int segmentIdx, b3WorldId worldId) {
-  for (int j = 0; j < segments[segmentIdx].totalRoadObjects; j++) {
-    srRoadObject *obj = &segments[segmentIdx].roadObjects[j];
-
-    if(obj->type == SR_ROAD_OBJECT_LANE) {
-      obj->box3DBodyId = createLaneBody(worldId, obj->initialPosition, obj->size);
-    } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
-      obj->box3DBodyId = createTunnelBody(worldId, obj->initialPosition, obj->size);
-      obj->model = createTunnelModel(obj->size);
-    } else {
-      assert(false && "Unknown road object type specified in the level data file.");
-    }
-  }
-}
-
-void initNextVisibleSegment(b3WorldId worldId) {
-  int nextSegmentIdx = MAX_VISIBLE_SEGMENTS - currentSegmentIdx;
-  initSegment(nextSegmentIdx, worldId);
-}
 
 b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize) {
   b3BodyDef shipBodyDef = b3DefaultBodyDef();
@@ -101,18 +80,13 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
   *shipLateralForce = (b3Vec3){0.0f, 0.0f, 0.0f};
   b3Body_SetLinearVelocity(shipBodyId, (b3Vec3){0.0f, 0.0f, 0.0f});
   b3Body_SetAngularVelocity(shipBodyId, (b3Vec3){0.0f, 0.0f, 0.0f});
-
   b3Body_SetTransform(shipBodyId, (b3Pos){shipPos.x, shipPos.y, shipPos.z}, b3Body_GetRotation(shipBodyId));
 
   if(shipIsExploding) {
     destroyExplosionSpheres(explosionSpheres);
   }
 
-  loadLevel(level);
-  for (int s = 0; s < MAX_VISIBLE_SEGMENTS; s++) {
-    initSegment(s, worldId);
-  }
-
+  loadLevel(level, worldId, roadObjects, &totalRoadObjects);
   shipIsExploding = false;
 }
 
@@ -227,7 +201,7 @@ int main() {
           destroyExplosionSpheres(explosionSpheres);
         }
         shipIsExploding = false;
-        unloadCurrentLevel();
+        unloadCurrentLevel(roadObjects, &totalRoadObjects);
         StopMusicStream(gameplayMusic);
         SeekMusicStream(menuMusic, 0.0);
         PlayMusicStream(menuMusic);
@@ -341,18 +315,16 @@ int main() {
       camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
       camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
 
-      for (int i = currentSegmentIdx; i < MIN(currentSegmentIdx + MAX_VISIBLE_SEGMENTS, totalSegments); i++ ) {
-        for (int j = 0; j < segments[i].totalRoadObjects; j++) {
-          srRoadObject *obj = &segments[i].roadObjects[j];
-          b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
+      for (int j = 0; j < totalRoadObjects; j++) {
+        srRoadObject *obj = &roadObjects[j];
+        b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
 
-          if(obj->type == SR_ROAD_OBJECT_LANE) {
-            DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
-            DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
-          } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
-            DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
-            drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
-          }
+        if(obj->type == SR_ROAD_OBJECT_LANE) {
+          DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
+          DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
+        } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
+          DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
+          drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
         }
       }
 
@@ -403,8 +375,6 @@ int main() {
         textFontColor
       );
 
-      // IF Z position of the Ship is higher than the Z position of the last lane of the current segment then 
-      // call the function initNextVisibleSegment(worldId) to load the bodies of the next visible segment.
       EndTextureMode();
 
     } else if (currentGameScreen == SR_SCREEN_LEVEL_MENU) {

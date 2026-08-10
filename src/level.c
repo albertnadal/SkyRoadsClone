@@ -22,23 +22,33 @@ static Color getColorFromId(int colorId) {
   }
 }
 
-void unloadCurrentLevel() {
-  for (int segmentIdx = 0; segmentIdx < totalSegments; segmentIdx++) {
-    srRoadSegment *currentRoadSegment = &segments[segmentIdx];
-    for (int roadObjectIdx = 0; roadObjectIdx < currentRoadSegment->totalRoadObjects; roadObjectIdx++) {
-      srRoadObject *roadObject = &currentRoadSegment->roadObjects[roadObjectIdx];
-      if (b3Body_IsValid(roadObject->box3DBodyId)) {
-        b3DestroyBody(roadObject->box3DBodyId);
-      }
+void unloadCurrentLevel(srRoadObject objects[], int* totalObjects) {
+  for (int roadObjectIdx = 0; roadObjectIdx < *totalObjects; roadObjectIdx++) {
+    srRoadObject *roadObject = &objects[roadObjectIdx];
+    if (b3Body_IsValid(roadObject->box3DBodyId)) {
+      b3DestroyBody(roadObject->box3DBodyId);
     }
-    currentRoadSegment->totalRoadObjects = 0;
   }
-
-  totalSegments = 0;
+  *totalObjects = 0;
 }
 
-void loadLevel(int level) {
-  unloadCurrentLevel();
+void initLevelObjects(b3WorldId worldId, srRoadObject objects[], int* totalObjects) {
+  for (int j = 0; j < *totalObjects; j++) {
+    srRoadObject *obj = &objects[j];
+
+    if(obj->type == SR_ROAD_OBJECT_LANE) {
+      obj->box3DBodyId = createLaneBody(worldId, obj->initialPosition, obj->size);
+    } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
+      obj->box3DBodyId = createTunnelBody(worldId, obj->initialPosition, obj->size);
+      obj->model = createTunnelModel(obj->size);
+    } else {
+      assert(false && "Unknown road object type specified in the level data file.");
+    }
+  }
+}
+
+void loadLevel(int level, b3WorldId worldId, srRoadObject objects[], int* totalObjects) {
+  unloadCurrentLevel(objects, totalObjects);
 
   char filename[64];
   snprintf(filename, sizeof(filename), "levels/level%d.dat", level);
@@ -46,11 +56,11 @@ void loadLevel(int level) {
   FILE *fp = fopen(filename, "r");
   assert(fp != NULL && "The file with the level data does not exist.");
 
-  totalSegments = 0;
-  srRoadSegment *currentRoadSegment = NULL;
   char line[512];
 
   while (fgets(line, sizeof(line), fp) != NULL) {
+    assert(*totalObjects < MAX_ROAD_OBJECTS_PER_LEVEL && "Reached the max number of road objects allowed per level.");
+
     line[strcspn(line, "\r\n")] = '\0';
     char *comment = strstr(line, "//");
     if (comment != NULL) {
@@ -67,28 +77,13 @@ void loadLevel(int level) {
       continue;
     }
 
-    if (*p == '#') {
-      if (currentRoadSegment != NULL && currentRoadSegment->totalRoadObjects > 0) {
-        currentRoadSegment->roadObjects[currentRoadSegment->totalRoadObjects - 1].isLast = true;
-      }
-
-      assert(totalSegments < MAX_SEGMENTS_PER_LEVEL && "Reached the max number of segments allowed per level.");
-      currentRoadSegment = &segments[totalSegments];
-      currentRoadSegment->totalRoadObjects = 0;
-      totalSegments++;
-      continue;
-    }
-
-    assert(currentRoadSegment != NULL && "No first segment is defined before defining road objects.");
-    assert(currentRoadSegment->totalRoadObjects < MAX_ROAD_OBJECTS_PER_SEGMENT && "Reached the max number of road objects allowed per segment.");
-
     float px, py, pz;
     float sx, sy, sz;
     int colorValue, type;
     int parsed = sscanf(p, "%f,%f,%f,%f,%f,%f,%d,%d", &px, &py, &pz, &sx, &sy, &sz, &colorValue, &type);
 
     assert(parsed == 8 && "Found a road object with an invalid number of parameters.");
-    srRoadObject *obj = &currentRoadSegment->roadObjects[currentRoadSegment->totalRoadObjects];
+    srRoadObject *obj = &objects[*totalObjects];
 
     obj->initialPosition = (Vector3){px, py, pz};
     obj->size = (Vector3){sx, sy, sz};
@@ -97,12 +92,8 @@ void loadLevel(int level) {
     obj->model = (Model){0};
     obj->isLast = false;
     memset(&obj->box3DBodyId, 0, sizeof(obj->box3DBodyId));
-    currentRoadSegment->totalRoadObjects++;
+    (*totalObjects)++;
   }
-
-  if (currentRoadSegment != NULL && currentRoadSegment->totalRoadObjects > 0) {
-    currentRoadSegment->roadObjects[currentRoadSegment->totalRoadObjects - 1].isLast = true;
-  }
-
   fclose(fp);
+  initLevelObjects(worldId, objects, totalObjects);
 }

@@ -6,9 +6,7 @@
 #include <box3d/box3d.h>
 
 #define DEBUG false
-#define MAX_SEGMENTS_PER_LEVEL 100
-#define MAX_ROAD_OBJECTS_PER_SEGMENT 100
-#define MAX_VISIBLE_SEGMENTS 2
+#define MAX_ROAD_OBJECTS_PER_LEVEL 300
 #define DISTANCE_BETWEEN_SHIP_AND_CAMERA 15.0f
 #define CAMERA_TARGET_Z_DISTANCE 19.0f
 #define GRAVITY 3 * -9.80665f
@@ -56,11 +54,6 @@ typedef struct {
   Model model;
   bool isLast;
 } srRoadObject;
-
-typedef struct {
-  int totalRoadObjects;
-  srRoadObject roadObjects[MAX_ROAD_OBJECTS_PER_SEGMENT];
-} srRoadSegment;
 
 typedef struct {
   Vector3 initialPosition;
