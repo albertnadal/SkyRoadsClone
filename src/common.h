@@ -5,7 +5,7 @@
 #include <raylib/raylib.h>
 #include <box3d/box3d.h>
 
-#define DEBUG false
+#define DEBUG true
 #define MAX_ROAD_OBJECTS_PER_LEVEL 300
 #define DISTANCE_BETWEEN_SHIP_AND_CAMERA 15.0f
 #define CAMERA_TARGET_Z_DISTANCE 19.0f

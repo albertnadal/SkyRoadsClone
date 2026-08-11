@@ -18,6 +18,10 @@ static Color getColorFromId(int colorId) {
     case 8:  return WHITE;
     case 9:  return GRAY;
     case 10: return BROWN;
+    case 11: return DARKGREEN;
+    case 12: return LIGHTGRAY;
+    case 13: return VIOLET;
+    case 14: return LIME;
     default: return WHITE;
   }
 }

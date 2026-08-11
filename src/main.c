@@ -91,9 +91,9 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
 }
 
 int main() {
-  if (!DEBUG) {
-    SetTraceLogLevel(LOG_NONE);
-  }
+#if !DEBUG
+  SetTraceLogLevel(LOG_NONE);
+#endif
   SetConfigFlags(FLAG_MSAA_4X_HINT);
   InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
   SetExitKey(KEY_NULL);
@@ -101,10 +101,12 @@ int main() {
   InitAudioDevice();
 
   srGameScreenType currentGameScreen = SR_SCREEN_MAIN_MENU;
+#if !DEBUG
   Music menuMusic = LoadMusicStream("music/menu.mp3");
   Music gameplayMusic = LoadMusicStream("music/gameplay.mp3");
   menuMusic.looping = true;
   gameplayMusic.looping = true;
+#endif
 
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
@@ -150,12 +152,16 @@ int main() {
   camera.projection = CAMERA_PERSPECTIVE;
 
   bool ignoreEscape = false;
+#if !DEBUG
   PlayMusicStream(menuMusic);
+#endif
 
   while (!WindowShouldClose() && !quitGame) {
 
     if (currentGameScreen == SR_SCREEN_MAIN_MENU) {
+#if !DEBUG
       UpdateMusicStream(menuMusic);
+#endif
       BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTexture(mainMenuBg, 0, 0, WHITE);
@@ -194,7 +200,9 @@ int main() {
 
       EndTextureMode();
     } else if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
+#if !DEBUG
       UpdateMusicStream(gameplayMusic);
+#endif
 
       if (IsKeyPressed(KEY_ESCAPE)) {
         if(shipIsExploding) {
@@ -202,9 +210,11 @@ int main() {
         }
         shipIsExploding = false;
         unloadCurrentLevel(roadObjects, &totalRoadObjects);
+#if !DEBUG
         StopMusicStream(gameplayMusic);
         SeekMusicStream(menuMusic, 0.0);
         PlayMusicStream(menuMusic);
+#endif
         ignoreEscape = true;
         currentGameScreen = SR_SCREEN_LEVEL_MENU;
         continue;
@@ -214,6 +224,15 @@ int main() {
       shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
       if (!shipIsExploding) {
+
+#if DEBUG
+        if (IsKeyDown(KEY_W)) {
+          b3Body_SetTransform(shipBodyId, (b3Pos){shipPosition.x, shipPosition.y, shipPosition.z - 25.0f}, b3Body_GetRotation(shipBodyId));
+        } else if (IsKeyDown(KEY_S)) {
+          b3Body_SetTransform(shipBodyId, (b3Pos){shipPosition.x, shipPosition.y, shipPosition.z + 25.0f}, b3Body_GetRotation(shipBodyId));
+        }
+#endif
+
         if (IsKeyDown(KEY_LEFT)) {
           shipLateralForce.x = -1500.0f;
         } else if (IsKeyDown(KEY_RIGHT)) {
@@ -308,10 +327,9 @@ int main() {
       }
 
       //DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
-      if (DEBUG) {
-        DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
-      }
-
+#if DEBUG
+      DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
+#endif
       camera.position.z = shipPosition.z + DISTANCE_BETWEEN_SHIP_AND_CAMERA;
       camera.target.z = camera.position.z - CAMERA_TARGET_Z_DISTANCE;
 
@@ -348,9 +366,9 @@ int main() {
       }
 
       EndMode3D();
-      if (DEBUG) {
-        DrawFPS(16, 16);
-      }
+#if DEBUG
+      DrawFPS(16, 16);
+#endif
 
       int hudX = (SCR_WIDTH - hudPanel.width) / 2;
       int hudY = SCR_HEIGHT - hudPanel.height - 20;
@@ -378,7 +396,9 @@ int main() {
       EndTextureMode();
 
     } else if (currentGameScreen == SR_SCREEN_LEVEL_MENU) {
+#if !DEBUG
       UpdateMusicStream(menuMusic);
+#endif
       BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTexture(levelMenuBg, 0, 0, WHITE);
@@ -404,9 +424,11 @@ int main() {
       }
 
       if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+#if !DEBUG
         StopMusicStream(menuMusic);
         SeekMusicStream(gameplayMusic, 0.0);
         PlayMusicStream(gameplayMusic);
+#endif
         currentGameScreen = SR_SCREEN_GAME_PLAY;
         playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
       }
@@ -436,8 +458,10 @@ int main() {
   UnloadTexture(mainMenuBg);
   UnloadFont(digitalFont);
   UnloadFont(retroFont);
+#if !DEBUG
   UnloadMusicStream(menuMusic);
   UnloadMusicStream(gameplayMusic);
+#endif
   CloseAudioDevice();
   CloseWindow();
   return 0;
