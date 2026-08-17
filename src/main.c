@@ -116,10 +116,12 @@ int main() {
 
   srGameScreenType currentGameScreen = SR_SCREEN_MAIN_MENU;
 #if !DEBUG
-  Music menuMusic = LoadMusicStream("music/menu.mp3");
-  Music gameplayMusic = LoadMusicStream("music/gameplay.mp3");
+  Music menuMusic = LoadMusicStream("audio/menu.mp3");
+  Music gameplayMusic = LoadMusicStream("audio/gameplay.mp3");
+  Music explosionFx = LoadMusicStream("audio/explosion.mp3");
   menuMusic.looping = true;
   gameplayMusic.looping = true;
+  explosionFx.looping = false;
 #endif
 
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
@@ -218,6 +220,7 @@ int main() {
     } else if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
 #if !DEBUG
       UpdateMusicStream(gameplayMusic);
+      UpdateMusicStream(explosionFx);
 #endif
 
       if (IsKeyPressed(KEY_ESCAPE)) {
@@ -228,6 +231,7 @@ int main() {
         unloadCurrentLevel(roadObjects, &totalRoadObjects);
 #if !DEBUG
         StopMusicStream(gameplayMusic);
+        StopMusicStream(explosionFx);
         SeekMusicStream(menuMusic, 0.0);
         PlayMusicStream(menuMusic);
 #endif
@@ -283,6 +287,10 @@ int main() {
             printf("FRONTAL COLLISION\n");
 #endif
             shipIsExploding = true;
+#if !DEBUG
+            SeekMusicStream(explosionFx, 0.0);
+            PlayMusicStream(explosionFx);
+#endif
             float explosionMagnitude = 0.0000001f + ((-prevShipSpeed.z * 0.0003f) / 100.0f);
             createExplosionSpheres(worldId, explosionSpheres, (Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize, 0.05f, 0.1f, explosionMagnitude);
           }
