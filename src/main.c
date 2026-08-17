@@ -90,6 +90,20 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
   shipIsExploding = false;
 }
 
+void updatePilotCamImage(Rectangle* pilotCamSource, float speed, bool exploding, float verticalPosition) {
+  if (exploding || (verticalPosition < SHIP_NEAR_FALL_LIMIT_Y)) {
+    pilotCamSource->x = PILOT_CAM_NO_SIGNAL_SPRITE_OFFSET;
+  } else if (speed < 60.0f) {
+    pilotCamSource->x = PILOT_CAM_COOL_FACE_SPRITE_OFFSET;
+  } else if (speed < 110.0f) {
+    pilotCamSource->x = PILOT_CAM_UPSET_FACE_SPRITE_OFFSET;
+  } else if (speed < 160.0f) {
+    pilotCamSource->x = PILOT_CAM_SCARY_FACE_SPRITE_OFFSET;
+  } else if (speed < 200.0f) {
+    pilotCamSource->x = PILOT_CAM_TERROR_FACE_SPRITE_OFFSET;
+  }
+}
+
 int main() {
 #if !DEBUG
   SetTraceLogLevel(LOG_NONE);
@@ -116,6 +130,8 @@ int main() {
   Texture2D bg = (Texture2D){0};
   Rectangle bgSize = (Rectangle){0};
   Texture2D hudPanel = LoadTexture("images/hud_panel.png");
+  Texture2D pilotCam = LoadTexture("images/pilot_cam.png");
+  Rectangle pilotCamSource = {0.0f, 0.0f, PILOT_CAM_WIDTH, PILOT_CAM_HEIGHT};
   Font digitalFont = LoadFont("fonts/digital.ttf");
   Font retroFont = LoadFont("fonts/retro.ttf");
   char speedText[SPEED_TEXT_BUFFER_SIZE];
@@ -224,7 +240,6 @@ int main() {
       shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
       if (!shipIsExploding) {
-
 #if DEBUG
         if (IsKeyDown(KEY_W)) {
           b3Body_SetTransform(shipBodyId, (b3Pos){shipPosition.x, shipPosition.y, shipPosition.z - 25.0f}, b3Body_GetRotation(shipBodyId));
@@ -264,7 +279,9 @@ int main() {
         for(int i = 0; i < events.hitCount && !shipIsExploding; i++) {
           b3ContactHitEvent *hit = &events.hitEvents[i];
           if(hit->normal.z == 1.0f) {
+#if DEBUG
             printf("FRONTAL COLLISION\n");
+#endif
             shipIsExploding = true;
             float explosionMagnitude = 0.0000001f + ((-prevShipSpeed.z * 0.0003f) / 100.0f);
             createExplosionSpheres(worldId, explosionSpheres, (Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize, 0.05f, 0.1f, explosionMagnitude);
@@ -277,7 +294,9 @@ int main() {
             b3ContactData data = b3Contact_GetData(event->contactId);
             for(int j = 0; j < data.manifoldCount; j++) {
               if(data.manifolds[j].normal.y == 1.0f) {
+#if DEBUG
                 printf("SHIP IS ON THE GROUND\n");
+#endif
                 shipOnGround = true;
                 availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
               }
@@ -295,7 +314,9 @@ int main() {
               ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.z > aabbB.upperBound.z)) ||
               ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.lowerBound.x > aabbB.upperBound.x)) ||
               ((aabbA.upperBound.y > aabbB.lowerBound.y) && (aabbA.upperBound.x < aabbB.lowerBound.x))) {
+#if DEBUG
                 printf("SHIP IS NOT ON THE GROUND\n");
+#endif
               shipOnGround = false;
             }
           }
@@ -370,8 +391,10 @@ int main() {
       DrawFPS(16, 16);
 #endif
 
+      updatePilotCamImage(&pilotCamSource, fabsf(shipSpeed.z), shipIsExploding, shipPosition.y);
       int hudX = (SCR_WIDTH - hudPanel.width) / 2;
       int hudY = SCR_HEIGHT - hudPanel.height - 20;
+      DrawTextureRec(pilotCam, pilotCamSource, (Vector2){hudX + hudPanel.width - PILOT_CAM_WIDTH - 40, hudY + 22}, WHITE);
       DrawTexture(hudPanel, hudX, hudY, WHITE);
 
       Vector2 textSize = MeasureTextEx(
