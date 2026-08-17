@@ -21,6 +21,9 @@
 #define PRESS_SPACE_TEXT_BUFFER_SIZE 32
 #define PRESS_SPACE_TEXT_FONT_SIZE 26.0f
 #define PRESS_SPACE_TEXT_FONT_SPACING -1.0f
+#define ROAD_COMPLETED_TEXT_BUFFER_SIZE 24
+#define ROAD_COMPLETED_TEXT_FONT_SIZE 26.0f
+#define ROAD_COMPLETED_TEXT_FONT_SPACING -1.0f
 #define DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR 2
 #define TOTAL_LEVELS 8
 #define PILOT_CAM_WIDTH 165
@@ -29,14 +32,15 @@
 #define PILOT_CAM_UPSET_FACE_SPRITE_OFFSET 165.0f
 #define PILOT_CAM_SCARY_FACE_SPRITE_OFFSET 330.0f
 #define PILOT_CAM_TERROR_FACE_SPRITE_OFFSET 495.0f
+#define PILOT_CAM_ROAD_COMPLETED_SPRITE_OFFSET 660.0f
 #define PILOT_CAM_NO_SIGNAL_SPRITE_OFFSET 831.0f
 
 #ifndef MIN
 #define MIN(a, b) ((a) < (b) ? (a) : (b))
 #endif
 
-static const float SCR_WIDTH  = 1280.0f; // * 3.0f;
-static const float SCR_HEIGHT = 800.0f; // * 2.7f;
+static const float SCR_WIDTH  = 1280.0f;// * 3.0f;
+static const float SCR_HEIGHT = 800.0f;// * 2.7f;
 static const float RES_WIDTH  = 1280.0f; //320
 static const float RES_HEIGHT = 800.0f; //200
 static const char WINDOW_TITLE[] = "VectorRoads";
@@ -60,6 +64,7 @@ typedef struct {
   srRoadObjectType type;
   b3BodyId box3DBodyId;
   Model model;
+  bool isExit;
 } srRoadObject;
 
 typedef struct {

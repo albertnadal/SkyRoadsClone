@@ -3,7 +3,7 @@
 
 #include "common.h"
 
-b3BodyId createTunnelBody(b3WorldId worldId, Vector3 tunnelPos, Vector3 tunnelSize);
+b3BodyId createTunnelBody(b3WorldId worldId, Vector3 tunnelPos, Vector3 tunnelSize, bool isExit);
 Model createTunnelModel(Vector3 tunnelSize);
 void drawTunnelWires(Vector3 tunnelPos, Vector3 tunnelSize, Color color);
 

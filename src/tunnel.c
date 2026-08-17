@@ -51,7 +51,7 @@ static void drawBoxWiresRotated(Vector3 center, Vector3 size, float rotation, Co
   }
 }
 
-b3BodyId createTunnelBody(b3WorldId worldId, Vector3 tunnelPos, Vector3 tunnelSize) {
+b3BodyId createTunnelBody(b3WorldId worldId, Vector3 tunnelPos, Vector3 tunnelSize, bool isExit) {
   b3BodyDef bodyDef = b3DefaultBodyDef();
   bodyDef.type = b3_staticBody;
   bodyDef.position = (b3Vec3){tunnelPos.x, tunnelPos.y, tunnelPos.z};
@@ -61,6 +61,8 @@ b3BodyId createTunnelBody(b3WorldId worldId, Vector3 tunnelPos, Vector3 tunnelSi
   b3ShapeDef shapeDef = b3DefaultShapeDef();
   shapeDef.baseMaterial.friction = 0.2f;
   shapeDef.baseMaterial.restitution = 0.0f;
+  shapeDef.isSensor = isExit;
+  shapeDef.enableSensorEvents = isExit;
 
   const float radius = tunnelSize.x * 0.5f;
   const float thickness = tunnelSize.x * 0.05f;

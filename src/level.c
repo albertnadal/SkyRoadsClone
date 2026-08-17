@@ -41,13 +41,15 @@ void initLevelObjects(b3WorldId worldId, srRoadObject objects[], int* totalObjec
     srRoadObject *obj = &objects[j];
 
     if(obj->type == SR_ROAD_OBJECT_LANE) {
-      obj->box3DBodyId = createLaneBody(worldId, obj->initialPosition, obj->size);
+      obj->box3DBodyId = createLaneBody(worldId, obj->initialPosition, obj->size, obj->isExit);
     } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
-      obj->box3DBodyId = createTunnelBody(worldId, obj->initialPosition, obj->size);
+      obj->box3DBodyId = createTunnelBody(worldId, obj->initialPosition, obj->size, obj->isExit);
       obj->model = createTunnelModel(obj->size);
     } else {
       assert(false && "Unknown road object type specified in the level data file.");
     }
+
+    b3Body_SetUserData(obj->box3DBodyId, obj);
   }
 }
 
@@ -83,10 +85,10 @@ void loadLevel(int level, b3WorldId worldId, srRoadObject objects[], int* totalO
 
     float px, py, pz;
     float sx, sy, sz;
-    int colorValue, type;
-    int parsed = sscanf(p, "%f,%f,%f,%f,%f,%f,%d,%d", &px, &py, &pz, &sx, &sy, &sz, &colorValue, &type);
+    int colorValue, type, exitValue;
+    int parsed = sscanf(p, "%f,%f,%f,%f,%f,%f,%d,%d,%d", &px, &py, &pz, &sx, &sy, &sz, &colorValue, &type, &exitValue);
 
-    assert(parsed == 8 && "Found a road object with an invalid number of parameters.");
+    assert(parsed == 9 && "Found a road object with an invalid number of parameters.");
     srRoadObject *obj = &objects[*totalObjects];
 
     obj->initialPosition = (Vector3){px, py, pz};
@@ -94,6 +96,7 @@ void loadLevel(int level, b3WorldId worldId, srRoadObject objects[], int* totalO
     obj->color = getColorFromId(colorValue);
     obj->type = (srRoadObjectType)type;
     obj->model = (Model){0};
+    obj->isExit = (exitValue != 0);
     memset(&obj->box3DBodyId, 0, sizeof(obj->box3DBodyId));
     (*totalObjects)++;
   }

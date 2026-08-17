@@ -10,6 +10,7 @@ int totalRoadObjects;
 srRoadObject roadObjects[MAX_ROAD_OBJECTS_PER_LEVEL] = {0};
 srExplosionSphere explosionSpheres[EXPLOSION_SPHERES_COUNT] = {0};
 bool shipIsExploding = false;
+bool shipReachedExit = false;
 bool shipOnGround = false;
 bool quitGame = false;
 int availableJumpsInTheAir = DEFAULT_AVAILABLE_JUMPS_IN_THE_AIR;
@@ -37,6 +38,7 @@ b3BodyId createShipBody(b3WorldId worldId, Vector3 shipPos, Vector3 shipSize) {
   shipShapeDef.baseMaterial.restitution = 0.0f;
   shipShapeDef.baseMaterial.friction = 0.2f;
   shipShapeDef.density = 200.0f;
+  shipShapeDef.enableSensorEvents = true;
 
   b3BoxHull shipBox = b3MakeBoxHull(shipSize.x * 0.5f, shipSize.y * 0.5f, shipSize.z * 0.5f);
   b3CreateHullShape(shipBodyId, &shipShapeDef, &shipBox.base);
@@ -88,10 +90,13 @@ void playLevel(int level, b3WorldId worldId, b3BodyId shipBodyId, Texture2D *bg,
 
   loadLevel(level, worldId, roadObjects, &totalRoadObjects);
   shipIsExploding = false;
+  shipReachedExit = false;
 }
 
-void updatePilotCamImage(Rectangle* pilotCamSource, float speed, bool exploding, float verticalPosition) {
-  if (exploding || (verticalPosition < SHIP_NEAR_FALL_LIMIT_Y)) {
+void updatePilotCamImage(Rectangle* pilotCamSource, float speed, bool exploding, bool reachedExit, float verticalPosition) {
+  if (reachedExit) {
+    pilotCamSource->x = PILOT_CAM_ROAD_COMPLETED_SPRITE_OFFSET;
+  } else if (exploding || (verticalPosition < SHIP_NEAR_FALL_LIMIT_Y)) {
     pilotCamSource->x = PILOT_CAM_NO_SIGNAL_SPRITE_OFFSET;
   } else if (speed < 60.0f) {
     pilotCamSource->x = PILOT_CAM_COOL_FACE_SPRITE_OFFSET;
@@ -140,6 +145,7 @@ int main() {
   Font retroFont = LoadFont("fonts/retro.ttf");
   char speedText[SPEED_TEXT_BUFFER_SIZE];
   char pressSpaceText[PRESS_SPACE_TEXT_BUFFER_SIZE] = "Press SPACE to continue...";
+  char roadCompletedText[ROAD_COMPLETED_TEXT_BUFFER_SIZE] = "Road Completed";
   Color textFontColor = (Color){83, 244, 65, 255};
   Color levelSelectorColor = (Color){83, 244, 65, 255};
 
@@ -157,6 +163,7 @@ int main() {
          shipLateralForce = {0.0f, 0.0f, 0.0f};
   Model shipModel = LoadModel("models/ship.glb");
   b3ContactEvents events;
+  b3SensorEvents sensorEvents;
 
   // Prepare for simulation. Typically we use a time step of 1/60 of a
   // second (60Hz) and 4 sub-steps. This provides a high quality simulation
@@ -230,6 +237,7 @@ int main() {
           destroyExplosionSpheres(explosionSpheres);
         }
         shipIsExploding = false;
+        shipReachedExit = false;
         unloadCurrentLevel(roadObjects, &totalRoadObjects);
 #if !DEBUG
         StopMusicStream(gameplayMusic);
@@ -245,7 +253,24 @@ int main() {
       b3World_Step(worldId, timeStep, subStepCount);
       shipSpeed = b3Body_GetLinearVelocity(shipBodyId);
 
-      if (!shipIsExploding) {
+      if (shipReachedExit) {
+        shipPosition = b3Body_GetPosition(shipBodyId);
+        if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
+          if(shipIsExploding) {
+            destroyExplosionSpheres(explosionSpheres);
+          }
+          shipIsExploding = false;
+          unloadCurrentLevel(roadObjects, &totalRoadObjects);
+#if !DEBUG
+          StopMusicStream(gameplayMusic);
+          StopMusicStream(explosionFx);
+          SeekMusicStream(menuMusic, 0.0);
+          PlayMusicStream(menuMusic);
+#endif
+          currentGameScreen = SR_SCREEN_LEVEL_MENU;
+        }
+
+      } else if (!shipIsExploding) {
 #if DEBUG
         if (IsKeyDown(KEY_W)) {
           b3Body_SetTransform(shipBodyId, (b3Pos){shipPosition.x, shipPosition.y, shipPosition.z - 25.0f}, b3Body_GetRotation(shipBodyId));
@@ -280,9 +305,26 @@ int main() {
         b3Body_ApplyForceToCenter(shipBodyId, shipEngineForce, true);
         b3Body_ApplyForceToCenter(shipBodyId, shipLateralForce, true);
 
+        sensorEvents = b3World_GetSensorEvents(worldId);
+
+        for(int i = 0; i < sensorEvents.beginCount && !shipIsExploding && !shipReachedExit; i++) {
+          b3SensorBeginTouchEvent *touch = &sensorEvents.beginEvents[i];
+          b3BodyId body = b3Shape_GetBody(touch->sensorShapeId);
+          if (b3Body_IsValid(body) ) {
+            srRoadObject *roadObject = b3Body_GetUserData(body);
+            if ((roadObject != NULL) && roadObject->isExit) {
+#if DEBUG
+              printf("SHIP REACHED EXIT\n");
+#endif
+              shipReachedExit = true;
+              break;
+            }
+          }
+        }
+
         events = b3World_GetContactEvents(worldId);
 
-        for(int i = 0; i < events.hitCount && !shipIsExploding; i++) {
+        for(int i = 0; i < events.hitCount && !shipIsExploding && !shipReachedExit; i++) {
           b3ContactHitEvent *hit = &events.hitEvents[i];
           if(1.0f - hit->normal.z <= 0.01f) {
 #if DEBUG
@@ -346,7 +388,7 @@ int main() {
 
       BeginMode3D(camera);
 
-      if (!shipIsExploding) {
+      if (!shipIsExploding && !shipReachedExit) {
         DrawModelEx(
           shipModel,
           (Vector3){shipPosition.x, shipPosition.y - 0.25f, shipPosition.z},
@@ -357,7 +399,6 @@ int main() {
         );
       }
 
-      //DrawCube((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, GREEN);
 #if DEBUG
       DrawCubeWires((Vector3){shipPosition.x, shipPosition.y, shipPosition.z}, shipSize.x, shipSize.y, shipSize.z, BLACK);
 #endif
@@ -366,15 +407,21 @@ int main() {
 
       for (int j = 0; j < totalRoadObjects; j++) {
         srRoadObject *obj = &roadObjects[j];
-        b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
+#if !DEBUG
+        if(!obj->isExit) {
+#endif
+          b3Pos pos = b3Body_GetPosition(obj->box3DBodyId);
 
-        if(obj->type == SR_ROAD_OBJECT_LANE) {
-          DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
-          DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
-        } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
-          DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
-          drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
+          if(obj->type == SR_ROAD_OBJECT_LANE) {
+            DrawCube((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, obj->color);
+            DrawCubeWires((Vector3){pos.x, pos.y, pos.z}, obj->size.x, obj->size.y, obj->size.z, BLACK);
+          } else if (obj->type == SR_ROAD_OBJECT_TUNNEL) {
+            DrawModel(obj->model, (Vector3){pos.x, pos.y, pos.z}, 1.0f, obj->color);
+            drawTunnelWires((Vector3){pos.x, pos.y, pos.z}, (Vector3){obj->size.x, obj->size.y, obj->size.z}, BLACK);
+          }
+#if !DEBUG
         }
+#endif
       }
 
       if (shipIsExploding) {
@@ -401,7 +448,7 @@ int main() {
       DrawFPS(16, 16);
 #endif
 
-      updatePilotCamImage(&pilotCamSource, fabsf(shipSpeed.z), shipIsExploding, shipPosition.y);
+      updatePilotCamImage(&pilotCamSource, fabsf(shipSpeed.z), shipIsExploding, shipReachedExit, shipPosition.y);
       int hudX = (SCR_WIDTH - hudPanel.width) / 2;
       int hudY = SCR_HEIGHT - hudPanel.height - 20;
       DrawTextureRec(pilotCam, pilotCamSource, (Vector2){hudX + hudPanel.width - PILOT_CAM_WIDTH - 40, hudY + 22}, WHITE);
@@ -425,6 +472,27 @@ int main() {
         SPEED_TEXT_FONT_SPACING,
         textFontColor
       );
+
+      if (shipReachedExit) {
+        textSize = MeasureTextEx(
+          retroFont,
+          roadCompletedText,
+          ROAD_COMPLETED_TEXT_FONT_SIZE,
+          ROAD_COMPLETED_TEXT_FONT_SPACING
+        );
+
+        DrawTextEx(
+          retroFont,
+          roadCompletedText,
+          (Vector2){
+            (SCR_WIDTH - textSize.x) / 2,
+            SCR_HEIGHT - (SCR_HEIGHT / 2)
+          },
+          ROAD_COMPLETED_TEXT_FONT_SIZE,
+          ROAD_COMPLETED_TEXT_FONT_SPACING,
+          textFontColor
+        );
+      }
 
       EndTextureMode();
 
