@@ -284,7 +284,7 @@ int main() {
 
         for(int i = 0; i < events.hitCount && !shipIsExploding; i++) {
           b3ContactHitEvent *hit = &events.hitEvents[i];
-          if(hit->normal.z == 1.0f) {
+          if(1.0f - hit->normal.z <= 0.01f) {
 #if DEBUG
             printf("FRONTAL COLLISION\n");
 #endif
