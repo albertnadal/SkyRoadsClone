@@ -119,9 +119,11 @@ int main() {
   Music menuMusic = LoadMusicStream("audio/menu.mp3");
   Music gameplayMusic = LoadMusicStream("audio/gameplay.mp3");
   Music explosionFx = LoadMusicStream("audio/explosion.mp3");
+  Music clickFx = LoadMusicStream("audio/click.mp3");
   menuMusic.looping = true;
   gameplayMusic.looping = true;
   explosionFx.looping = false;
+  clickFx.looping = false;
 #endif
 
   RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
@@ -429,10 +431,12 @@ int main() {
     } else if (currentGameScreen == SR_SCREEN_LEVEL_MENU) {
 #if !DEBUG
       UpdateMusicStream(menuMusic);
+      UpdateMusicStream(clickFx);
 #endif
       BeginTextureMode(target);
       ClearBackground(BLACK);
       DrawTexture(levelMenuBg, 0, 0, WHITE);
+      bool arrowKeyPressed = false;
 
       if (!ignoreEscape && IsKeyPressed(KEY_ESCAPE)) {
         ignoreEscape = true;
@@ -444,19 +448,31 @@ int main() {
 
       if (IsKeyPressed(KEY_LEFT)) {
         selectedLevel = ((selectedLevel - (TOTAL_LEVELS / 2)) + TOTAL_LEVELS) % TOTAL_LEVELS;
+        arrowKeyPressed = true;
       } else if (IsKeyPressed(KEY_RIGHT)) {
         selectedLevel = ((TOTAL_LEVELS / 2) + selectedLevel) % TOTAL_LEVELS;
+        arrowKeyPressed = true;
       }
 
       if (IsKeyPressed(KEY_UP)) {
         selectedLevel = (selectedLevel - 1 + TOTAL_LEVELS) % TOTAL_LEVELS;
+        arrowKeyPressed = true;
       } else if (IsKeyPressed(KEY_DOWN)) {
         selectedLevel = (selectedLevel + 1) % TOTAL_LEVELS;
+        arrowKeyPressed = true;
       }
+
+#if !DEBUG
+      if (arrowKeyPressed) {
+        SeekMusicStream(clickFx, 0.0);
+        PlayMusicStream(clickFx);
+      }
+#endif
 
       if (IsKeyPressed(KEY_SPACE) || IsKeyPressed(KEY_ENTER)) {
 #if !DEBUG
         StopMusicStream(menuMusic);
+        StopMusicStream(clickFx);
         SeekMusicStream(gameplayMusic, 0.0);
         PlayMusicStream(gameplayMusic);
 #endif
