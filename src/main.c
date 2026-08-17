@@ -569,6 +569,7 @@ int main() {
   UnloadModel(shipModel);
   UnloadTexture(bg);
   UnloadTexture(hudPanel);
+  UnloadTexture(pilotCam);
   UnloadTexture(levelMenuBg);
   UnloadTexture(mainMenuBg);
   UnloadFont(digitalFont);
