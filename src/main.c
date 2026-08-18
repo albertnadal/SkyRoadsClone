@@ -113,8 +113,12 @@ int main() {
 #if !DEBUG
   SetTraceLogLevel(LOG_NONE);
 #endif
+  static const char pressSpaceText[] = "Press SPACE to continue...";
+  static const char authorText[] = "Albert Nadal Garriga (2026)";
+  static const char roadCompletedText[] = "Road Completed";
+
   SetConfigFlags(FLAG_MSAA_4X_HINT);
-  InitWindow(SCR_WIDTH, SCR_HEIGHT, WINDOW_TITLE);
+  InitWindow(SCR_WIDTH, SCR_HEIGHT, "VectorRoads");
   SetExitKey(KEY_NULL);
   SetTargetFPS(60);
   InitAudioDevice();
@@ -131,21 +135,22 @@ int main() {
   clickFx.looping = false;
 #endif
 
-  RenderTexture2D target = LoadRenderTexture(RES_WIDTH, RES_HEIGHT);
+  RenderTexture2D target = LoadRenderTexture(SCR_WIDTH, SCR_HEIGHT);
   SetTextureFilter(target.texture, TEXTURE_FILTER_POINT);
 
   Texture2D mainMenuBg = LoadTexture("images/main_menu.png");
   Texture2D levelMenuBg = LoadTexture("images/level_menu.png");
   Texture2D bg = (Texture2D){0};
   Rectangle bgSize = (Rectangle){0};
+  Rectangle mainMenuSize = (Rectangle){0, 0, (float)mainMenuBg.width, (float)mainMenuBg.height};
+  Rectangle levelMenuSize = (Rectangle){0, 0, (float)levelMenuBg.width, (float)levelMenuBg.height};
+  Rectangle resSize = (Rectangle){0, 0, SCR_WIDTH, SCR_HEIGHT};
   Texture2D hudPanel = LoadTexture("images/hud_panel.png");
   Texture2D pilotCam = LoadTexture("images/pilot_cam.png");
   Rectangle pilotCamSource = {0.0f, 0.0f, PILOT_CAM_WIDTH, PILOT_CAM_HEIGHT};
   Font digitalFont = LoadFont("fonts/digital.ttf");
   Font retroFont = LoadFont("fonts/retro.ttf");
   char speedText[SPEED_TEXT_BUFFER_SIZE];
-  char pressSpaceText[PRESS_SPACE_TEXT_BUFFER_SIZE] = "Press SPACE to continue...";
-  char roadCompletedText[ROAD_COMPLETED_TEXT_BUFFER_SIZE] = "Road Completed";
   Color textFontColor = (Color){83, 244, 65, 255};
   Color levelSelectorColor = (Color){83, 244, 65, 255};
 
@@ -191,7 +196,7 @@ int main() {
 #endif
       BeginTextureMode(target);
       ClearBackground(BLACK);
-      DrawTexture(mainMenuBg, 0, 0, WHITE);
+      DrawTexturePro(mainMenuBg, mainMenuSize, resSize, (Vector2){0,0}, 0.0f, WHITE);
 
       if (!ignoreEscape && IsKeyPressed(KEY_ESCAPE)) {
         quitGame = true;
@@ -216,8 +221,8 @@ int main() {
           retroFont,
           pressSpaceText,
           (Vector2){
-            (SCR_WIDTH - textSize.x) / 2,
-            SCR_HEIGHT - (SCR_HEIGHT / 3)
+            (SCR_WIDTH - textSize.x) / 2.0f,
+            SCR_HEIGHT - (SCR_HEIGHT / 2.5f)
           },
           PRESS_SPACE_TEXT_FONT_SIZE,
           PRESS_SPACE_TEXT_FONT_SPACING,
@@ -225,6 +230,24 @@ int main() {
         );
       }
 
+      Vector2 authorTextSize = MeasureTextEx(
+        retroFont,
+        authorText,
+        AUTHOR_TEXT_FONT_SIZE,
+        AUTHOR_TEXT_FONT_SPACING
+      );
+
+      DrawTextEx(
+        retroFont,
+        authorText,
+        (Vector2){
+          (SCR_WIDTH - authorTextSize.x) / 2,
+          SCR_HEIGHT - 25.0f * ZOOM
+        },
+        AUTHOR_TEXT_FONT_SIZE,
+        AUTHOR_TEXT_FONT_SPACING,
+        WHITE
+      );
       EndTextureMode();
     } else if (currentGameScreen == SR_SCREEN_GAME_PLAY) {
 #if !DEBUG
@@ -384,7 +407,7 @@ int main() {
 
       BeginTextureMode(target);
       ClearBackground(BLACK);
-      DrawTexturePro(bg, bgSize, bgSize, (Vector2){0,0}, 0.0f, WHITE);
+      DrawTexturePro(bg, bgSize, resSize, (Vector2){0,0}, 0.0f, WHITE);
 
       BeginMode3D(camera);
 
@@ -449,10 +472,10 @@ int main() {
 #endif
 
       updatePilotCamImage(&pilotCamSource, fabsf(shipSpeed.z), shipIsExploding, shipReachedExit, shipPosition.y);
-      int hudX = (SCR_WIDTH - hudPanel.width) / 2;
-      int hudY = SCR_HEIGHT - hudPanel.height - 20;
-      DrawTextureRec(pilotCam, pilotCamSource, (Vector2){hudX + hudPanel.width - PILOT_CAM_WIDTH - 40, hudY + 22}, WHITE);
-      DrawTexture(hudPanel, hudX, hudY, WHITE);
+      int hudX = (SCR_WIDTH - hudPanel.width * ZOOM) / 2;
+      int hudY = SCR_HEIGHT - hudPanel.height * ZOOM - 20 * ZOOM;
+      DrawTexturePro(pilotCam, pilotCamSource, (Rectangle){hudX + hudPanel.width * ZOOM - PILOT_CAM_WIDTH * ZOOM - 40 * ZOOM, hudY + 22 * ZOOM, PILOT_CAM_WIDTH * ZOOM, PILOT_CAM_HEIGHT * ZOOM}, (Vector2){0, 0}, 0.0f, WHITE);
+      DrawTextureEx(hudPanel, (Vector2){hudX, hudY}, 0.0f, ZOOM, WHITE);
 
       Vector2 textSize = MeasureTextEx(
         digitalFont,
@@ -465,8 +488,8 @@ int main() {
         digitalFont,
         speedText,
         (Vector2){
-          hudX + (hudPanel.width / 2) - textSize.x - 50.0f,
-          hudY + (hudPanel.height / 4) - 1
+          hudX + (hudPanel.width * ZOOM / 2) - textSize.x - 50.0f * ZOOM ,
+          hudY + (hudPanel.height * ZOOM / 4) - 1
         },
         SPEED_TEXT_FONT_SIZE,
         SPEED_TEXT_FONT_SPACING,
@@ -503,7 +526,7 @@ int main() {
 #endif
       BeginTextureMode(target);
       ClearBackground(BLACK);
-      DrawTexture(levelMenuBg, 0, 0, WHITE);
+      DrawTexturePro(levelMenuBg, levelMenuSize, resSize, (Vector2){0,0}, 0.0f, WHITE);
       bool arrowKeyPressed = false;
 
       if (!ignoreEscape && IsKeyPressed(KEY_ESCAPE)) {
@@ -548,7 +571,7 @@ int main() {
         playLevel(selectedLevel, worldId, shipBodyId, &bg, &bgSize, &shipEngineForce, &shipLateralForce);
       }
 
-      Rectangle levelSelectorRect = (Rectangle){192 + ((selectedLevel < (TOTAL_LEVELS / 2)) ? 0 : 661), 52 + (selectedLevel % (TOTAL_LEVELS / 2) * 196), 225, 141};
+      Rectangle levelSelectorRect = (Rectangle){LEVEL_MENU_SELECTOR_LEFT_MARGIN + ((selectedLevel < (TOTAL_LEVELS / 2)) ? 0 : LEVEL_MENU_SELECTOR_MID_MARGIN), LEVEL_MENU_SELECTOR_TOP_MARGIN + (selectedLevel % (TOTAL_LEVELS / 2) * LEVEL_MENU_SELECTOR_VERTICAL_MARGIN), LEVEL_MENU_SELECTOR_WIDTH, LEVEL_MENU_SELECTOR_HEIGHT};
       DrawRectangleLinesEx(levelSelectorRect, 5.0f, levelSelectorColor);
       EndTextureMode();
     }
@@ -556,7 +579,7 @@ int main() {
     BeginDrawing();
     DrawTexturePro(
         target.texture,
-        (Rectangle){0, 0, RES_WIDTH, -RES_HEIGHT},
+        (Rectangle){0, 0, SCR_WIDTH, -SCR_HEIGHT},
         (Rectangle){0, 0, SCR_WIDTH, SCR_HEIGHT},
         (Vector2){0,0},
         0.0f,
