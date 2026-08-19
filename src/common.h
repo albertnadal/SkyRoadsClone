@@ -6,7 +6,7 @@
 #include <box3d/box3d.h>
 
 #define DEBUG 0
-#define ZOOM 1.0f // 1.0f = 1280x800px | 1.09375 = 1400x875px | 
+#define ZOOM 1.0f // 1.0f = 1280x800px | 1.09375f = 1400x875px | 1.125f = 1440x900px | 1.5f = 1920×1200px (Full HD) | 2.0f = 2560×1600px (2K) | 2.25f = 2880×1800px | 3.0f = 3840×2400px (4K)
 
 #define MAX_ROAD_OBJECTS_PER_LEVEL 300
 #define DISTANCE_BETWEEN_SHIP_AND_CAMERA 15.0f
